@@ -1,6 +1,6 @@
 import logging
 
-from langchain_openai import ChatOpenAI
+from utils.llm_factory import get_llm
 
 from nodes.coaching_nodes import TRADING_PHILOSOPHY
 
@@ -18,13 +18,13 @@ _SYSTEM_PROMPT = """\
 
 """ + TRADING_PHILOSOPHY
 
-_llm: ChatOpenAI | None = None
+_llm = None
 
 
-def _get_llm() -> ChatOpenAI:
+def _get_llm():
     global _llm
     if _llm is None:
-        _llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+        _llm = get_llm(temperature=0.3)
     return _llm
 
 

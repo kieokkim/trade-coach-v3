@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "grandalf==0.8",
+    "langchain-groq>=0.3.8",
     "langchain[openai]==0.3.27",
     "langgraph==0.6.6",
     "langgraph-checkpoint-sqlite==2.0.11",

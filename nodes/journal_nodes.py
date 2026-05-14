@@ -4,21 +4,18 @@ import logging
 
 import pandas as pd
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
+
+from utils.llm_factory import get_llm
 
 logger = logging.getLogger(__name__)
 
-_llm: ChatOpenAI | None = None
+_llm = None
 
 
-def _get_llm() -> ChatOpenAI:
+def _get_llm():
     global _llm
     if _llm is None:
-        _llm = ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0,
-            model_kwargs={"response_format": {"type": "json_object"}},
-        )
+        _llm = get_llm(temperature=0).bind(response_format={"type": "json_object"})
     return _llm
 
 

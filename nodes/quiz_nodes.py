@@ -2,15 +2,16 @@ import logging
 from datetime import date
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
+
+from utils.llm_factory import get_llm
 
 from db import get_db
 from tools.concept_tool import search_ict_concept, CONCEPT_NOT_FOUND_PREFIX
 
 logger = logging.getLogger(__name__)
 
-_quiz_llm: ChatOpenAI | None = None
-_eval_llm:  ChatOpenAI | None = None
+_quiz_llm = None
+_eval_llm  = None
 
 _QUIZ_GENERATE_SYSTEM = """\
 당신은 트레이딩 코치입니다. ICT 개념 설명을 바탕으로 트레이더를 위한 퀴즈 문항 1개를 만드세요.
@@ -35,17 +36,17 @@ pass: [한 줄 피드백]
 fail: [한 줄 피드백과 힌트]"""
 
 
-def _get_quiz_llm() -> ChatOpenAI:
+def _get_quiz_llm():
     global _quiz_llm
     if _quiz_llm is None:
-        _quiz_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.5)
+        _quiz_llm = get_llm(temperature=0.5)
     return _quiz_llm
 
 
-def _get_eval_llm() -> ChatOpenAI:
+def _get_eval_llm():
     global _eval_llm
     if _eval_llm is None:
-        _eval_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        _eval_llm = get_llm(temperature=0)
     return _eval_llm
 
 

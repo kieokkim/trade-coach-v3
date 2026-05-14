@@ -3,7 +3,8 @@ import logging
 
 import pandas as pd
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
+
+from utils.llm_factory import get_llm
 
 from config import (
     WIN_RATE_THRESHOLD,
@@ -17,7 +18,7 @@ from tools.concept_tool import search_ict_concept, CONCEPT_NOT_FOUND_PREFIX
 
 logger = logging.getLogger(__name__)
 
-_llm: ChatOpenAI | None = None
+_llm = None
 
 _ACTION_RULE_SYSTEM = """\
 당신은 트레이딩 코치입니다. 트레이더의 성과 지표를 보고 내일 당장 실행할 구체적인 규칙을 한국어로 한 문장 작성하세요.
@@ -33,10 +34,10 @@ _WEAKNESS_RULES = [
 ]
 
 
-def _get_llm() -> ChatOpenAI:
+def _get_llm():
     global _llm
     if _llm is None:
-        _llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+        _llm = get_llm(temperature=0.3)
     return _llm
 
 

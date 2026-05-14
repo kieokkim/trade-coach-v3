@@ -4,7 +4,8 @@ from datetime import date
 from pathlib import Path
 
 from langchain_core.messages import AIMessage
-from langchain_openai import ChatOpenAI
+
+from utils.llm_factory import get_llm
 
 from db import get_db
 from tools.concept_tool import search_ict_concept, CONCEPT_NOT_FOUND_PREFIX
@@ -37,13 +38,13 @@ _COACH_SYSTEM = """\
 
 """ + TRADING_PHILOSOPHY
 
-_coach_llm: ChatOpenAI | None = None
+_coach_llm = None
 
 
-def _get_coach_llm() -> ChatOpenAI:
+def _get_coach_llm():
     global _coach_llm
     if _coach_llm is None:
-        _coach_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+        _coach_llm = get_llm(temperature=0.3)
     return _coach_llm
 
 
@@ -106,25 +107,21 @@ _GENERATE_SYSTEM = """\
 
 _CATEGORY_MAP = {"ICT개념": "ict", "심리": "psychology", "패턴": "pattern"}
 
-_classify_llm: ChatOpenAI | None = None
-_generate_llm: ChatOpenAI | None = None
+_classify_llm = None
+_generate_llm = None
 
 
-def _get_classify_llm() -> ChatOpenAI:
+def _get_classify_llm():
     global _classify_llm
     if _classify_llm is None:
-        _classify_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        _classify_llm = get_llm(temperature=0)
     return _classify_llm
 
 
-def _get_generate_llm() -> ChatOpenAI:
+def _get_generate_llm():
     global _generate_llm
     if _generate_llm is None:
-        _generate_llm = ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0.3,
-            model_kwargs={"response_format": {"type": "json_object"}},
-        )
+        _generate_llm = get_llm(temperature=0.3).bind(response_format={"type": "json_object"})
     return _generate_llm
 
 
