@@ -77,6 +77,32 @@ for buy in buy_trades:
             used_sells.add(j)
             break
 
+# ── 사이드바: 에이전트 파이프라인 ───────────────────────────────────────────
+_NODE_INFO = [
+    {"name": "memory_load",        "desc": "과거 약점/세션 로드",        "llm": False},
+    {"name": "new_data_check",     "desc": "신규 거래 여부 확인",        "llm": False},
+    {"name": "bybit_fetch",        "desc": "Bybit API 거래내역 수집",    "llm": False},
+    {"name": "preprocess",         "desc": "pandas 데이터 정규화",       "llm": False},
+    {"name": "journal_write",      "desc": "매매일지 자동 작성",         "llm": True},
+    {"name": "journal_analysis",   "desc": "KPI 4가지 산출",            "llm": True},
+    {"name": "weakness_detect",    "desc": "약점 태그 추출",             "llm": False},
+    {"name": "performance_analysis","desc": "주간/월간 성과 요약",       "llm": True},
+    {"name": "backtest_coach",     "desc": "ICT 코칭 생성",             "llm": True},
+    {"name": "candle_fetch",       "desc": "진입시점 캔들 복원",         "llm": False},
+    {"name": "ict_detect",         "desc": "FVG rule-based 탐지",       "llm": False},
+    {"name": "replay_coach",       "desc": "복기 코멘트 생성",           "llm": True},
+]
+
+st.sidebar.divider()
+st.sidebar.caption("🤖 에이전트 파이프라인")
+for _node in _NODE_INFO:
+    _badge = "🧠 LLM" if _node["llm"] else "⚙️ Rule"
+    st.sidebar.markdown(
+        f"**{_node['name']}** {_badge}  \n"
+        f"<small>{_node['desc']}</small>",
+        unsafe_allow_html=True,
+    )
+
 st.title("📊 TradeCoach 대시보드")
 
 tab1, tab2, tab3 = st.tabs(["📊 KPI 대시보드", "📋 거래내역 리스트", "📚 셋업 태깅"])
