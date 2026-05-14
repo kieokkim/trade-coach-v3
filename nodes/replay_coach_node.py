@@ -2,6 +2,8 @@ import logging
 
 from langchain_openai import ChatOpenAI
 
+from nodes.coaching_nodes import TRADING_PHILOSOPHY
+
 logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = """\
@@ -12,7 +14,9 @@ _SYSTEM_PROMPT = """\
 1. 진입 근거가 ICT 관점에서 좋았는지 나빴는지 명확하게 판단
 2. FVG, OB 등 감지된 패턴과 실제 진입/청산의 관계 언급
 3. 개선할 수 있는 구체적인 제안 1개 제시
-4. 200자 이내 평문으로 작성"""
+4. 200자 이내 평문으로 작성
+
+""" + TRADING_PHILOSOPHY
 
 _llm: ChatOpenAI | None = None
 

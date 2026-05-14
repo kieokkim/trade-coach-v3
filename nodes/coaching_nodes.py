@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 
 _CONCEPTS_PATH = Path(__file__).parent.parent / "tools" / "ict_concepts.json"
 
+TRADING_PHILOSOPHY = """\
+[트레이딩 철학 — 반드시 준수]
+1. 연속 3번 손절 시 즉시 중단한다.
+2. 매 거래마다 최대 손실금액을 사전에 고정한다 (손해보지 않는 트레이딩).
+3. 감정적 복수 매매(Revenge Trading)는 절대 하지 않는다.
+4. 셋업이 없으면 진입하지 않는다 (No Setup = No Trade).
+5. 손절선은 진입 전에 반드시 먼저 결정한다."""
+
 # ─────────────────────────────── backtest_coach_node ────────────────────────
 
 _COACH_SYSTEM = """\
@@ -25,7 +33,9 @@ _COACH_SYSTEM = """\
 3. 내일 당장 실행할 수 있는 구체적 규칙 1~2개 제시
 4. 추가 약점이 있으면 각 1문장씩 간략히 언급
 
-응답은 300자 이내의 평문(plain text)으로 작성하세요."""
+응답은 300자 이내의 평문(plain text)으로 작성하세요.
+
+""" + TRADING_PHILOSOPHY
 
 _coach_llm: ChatOpenAI | None = None
 
@@ -212,7 +222,9 @@ def fallback_classify_node(state: dict) -> dict:
 _SETUP_SUGGESTION_SYSTEM = """\
 당신은 ICT(Inner Circle Trader) 전문 트레이딩 코치입니다.
 트레이더의 셋업별 수익률 데이터를 보고 개선 제안을 한국어 1~2문장으로 작성하세요.
-가장 수익난 셋업을 강화하고, 가장 손실난 셋업의 개선점을 구체적으로 제시하세요."""
+가장 수익난 셋업을 강화하고, 가장 손실난 셋업의 개선점을 구체적으로 제시하세요.
+
+""" + TRADING_PHILOSOPHY
 
 
 def generate_setup_suggestion(

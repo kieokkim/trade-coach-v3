@@ -18,9 +18,10 @@ progress = st.progress(0)
 status = st.empty()
 
 steps = [
-    (20, "Bybit API 연결 중..."),
-    (50, "거래내역 수집 중..."),
-    (80, "ICT 패턴 분석 중..."),
+    (10, "Bybit API 연결 시도 중..."),
+    (30, "거래 데이터 수집 중..."),
+    (60, "ICT 패턴 분석 중..."),
+    (80, "코칭 피드백 생성 중..."),
 ]
 
 for pct, msg in steps:
@@ -74,7 +75,8 @@ st.session_state["last_quiz_concept"]    = result.get("current_concept", "")
 st.session_state.pop("last_quiz_result",   None)
 st.session_state.pop("last_quiz_feedback", None)
 
-status.success("분석 완료!")
+trade_count = len(result.get("raw_trades", []))
+status.success(f"분석 완료! 거래 {trade_count}건 처리됨")
 progress.progress(100)
 time.sleep(0.5)
 

@@ -2,6 +2,23 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+# ── 유틸: ms → KST 문자열 ─────────────────────────────────────────────────
+def _ms_to_kst(ms) -> str:
+    return (
+        pd.to_datetime(int(ms), unit="ms", utc=True)
+        .tz_convert("Asia/Seoul")
+        .strftime("%Y-%m-%d %H:%M")
+    )
+
+_COL_KO = {
+    "execTime":  "체결시간(KST)",
+    "symbol":    "종목",
+    "side":      "방향",
+    "execPrice": "체결가",
+    "orderQty":  "수량",
+    "closedPnl": "손익(USDT)",
+}
+
 from nodes.quiz_nodes import evaluate_quiz
 from nodes.replay_coach_node import replay_coach_node
 from nodes.coaching_nodes import generate_setup_suggestion
@@ -31,6 +48,13 @@ with tab1:
     stats = st.session_state.get("last_stats", {})
 
     st.subheader("📌 핵심 지표")
+    with st.expander("ℹ️ 지표 설명 보기"):
+        st.markdown(
+            "- **승률**: 전체 거래 중 익절로 마감된 비율\n"
+            "- **평균 수익률**: 익절/손절을 포함한 거래당 평균 손익률 (%)\n"
+            "- **기대값**: `승률 × 평균수익 − 패율 × 평균손실` — 0 이상이면 장기적으로 수익\n"
+            "- **손절 일관성**: 손절 금액이 얼마나 일정한지 (1에 가까울수록 손절 기준이 규칙적)"
+        )
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("승률",        f"{stats.get('win_rate', 0):.1%}")
     c2.metric("평균 수익률", f"{stats.get('avg_return_rate', 0):.2f}%")
@@ -72,6 +96,13 @@ with tab1:
         quiz_result = st.session_state.get("last_quiz_result", "")
 
         if not quiz_result:
+            if st.button("💡 힌트 보기", key="quiz_hint_btn"):
+                st.session_state["quiz_show_hint"] = True
+            if st.session_state.get("quiz_show_hint"):
+                concept = st.session_state.get("last_quiz_concept", "")
+                if concept:
+                    st.info(f"힌트: 이 문제는 **{concept}** 개념과 관련이 있습니다.")
+
             quiz_answer = st.text_input(
                 "답변을 입력하세요",
                 key="quiz_answer_input",
@@ -103,6 +134,7 @@ with tab1:
                     st.session_state["quiz_retry_count"] = retry
                     st.session_state.pop("last_quiz_result",   None)
                     st.session_state.pop("last_quiz_feedback", None)
+                    st.session_state.pop("quiz_show_hint",     None)
                     st.rerun()
 
 # ════════════════════════ Tab 2: 거래내역 리스트 + 복기 뷰어 ════════════════
@@ -135,12 +167,17 @@ with tab2:
     if raw_trades:
         df_trades = pd.DataFrame(raw_trades)
         display_cols = [c for c in ["execTime", "symbol", "side", "execPrice", "orderQty", "closedPnl"] if c in df_trades.columns]
-        st.dataframe(df_trades[display_cols] if display_cols else df_trades, use_container_width=True)
+        df_display = df_trades[display_cols].copy() if display_cols else df_trades.copy()
+        if "execTime" in df_display.columns:
+            df_display["execTime"] = df_display["execTime"].apply(_ms_to_kst)
+        df_display.rename(columns={k: v for k, v in _COL_KO.items() if k in df_display.columns}, inplace=True)
+        st.dataframe(df_display, use_container_width=True)
     else:
         st.caption("거래내역 없음")
 
     # ── 매매일지 (journal_entries 기반) ──────────────────────────────────────
     if journal_entries:
+        journal_entries = sorted(journal_entries, key=lambda x: x.get("date", ""))
         st.divider()
         st.subheader("📒 매매일지")
         for entry in journal_entries:
@@ -348,7 +385,7 @@ with tab3:
         st.caption("표시할 트레이드 쌍이 없습니다.")
     else:
         tag_labels = [
-            f"{b.get('symbol')} | {b.get('execTime')} → {s.get('execTime')}"
+            f"{b.get('symbol')} | {_ms_to_kst(b.get('execTime', 0))} → {_ms_to_kst(s.get('execTime', 0))}"
             for b, s in tag_pairs
         ]
         selected_tag = st.selectbox("트레이드 선택", tag_labels, key="tag_select")
