@@ -4,7 +4,7 @@ from pathlib import Path
 import streamlit as st
 
 from graph import DEFAULT_STATE, graph
-from utils.constants import NODE_LABELS
+from utils.constants import NODE_LABELS, sidebar_pipeline_md
 
 st.set_page_config(page_title="TradeCoach | 분석 중", page_icon="⏳", layout="centered")
 
@@ -13,6 +13,32 @@ st.title("⏳ 데이터 수집 & 분석")
 sample_label = st.session_state.get("sample_label", "")
 if sample_label:
     st.caption(f"모드: {sample_label}")
+
+STATUS_MESSAGES = {
+    "memory_load":          "이전 세션 기록을 불러오는 중...",
+    "new_data_check":       "신규 거래내역을 확인하는 중...",
+    "bybit_fetch":          "거래내역을 수집하는 중...",
+    "preprocess":           "데이터를 정리하는 중...",
+    "journal_write":        "매매일지를 작성하는 중...",
+    "journal_analysis":     "핵심 지표를 분석하는 중...",
+    "weakness_detect":      "약점 패턴을 탐지하는 중...",
+    "performance_analysis": "성과를 요약하는 중...",
+    "backtest_coach":       "ICT 코칭을 생성하는 중...",
+    "quiz_generate":        "퀴즈를 생성하는 중...",
+    "memory_save":          "분석 결과를 저장하는 중...",
+}
+
+progress    = st.progress(0)
+status_text = st.empty()
+
+# 사이드바 노드 로그 (개발자용)
+st.sidebar.divider()
+sidebar_log = st.sidebar.empty()
+
+
+def render_sidebar(done: list[str], current: str | None) -> None:
+    sidebar_log.markdown(sidebar_pipeline_md(done, current))
+
 
 # ── 샘플 모드: TC_SAMPLE_FILE env var 설정 후 API 키 임시 제거 ───────────────
 _SAMPLE_FILE_MAP = {
@@ -30,40 +56,48 @@ elif not st.session_state.get("api_ready", False):
     _saved_api_key = os.environ.pop("BYBIT_API_KEY", None)
 
 # ── invoke_state 구성 ────────────────────────────────────────────────────────
-session_id  = st.session_state.get("session_id", "default")
+session_id   = st.session_state.get("session_id", "default")
 invoke_state = {
     **DEFAULT_STATE,
-    "session_id":  session_id,
-    "input_type":  "bybit",
+    "session_id":   session_id,
+    "input_type":   "bybit",
     "journal_data": "",
-    "raw_trades":  [],
+    "raw_trades":   [],
 }
 
-# ── graph.stream() 실시간 노드 로그 ─────────────────────────────────────────
-completed: list[str] = []
-result:    dict      = {}
-log_area   = st.empty()
+# ── graph.stream() ───────────────────────────────────────────────────────────
+completed:           list[str] = []
+result:              dict      = {}
+raw_trades_captured: list      = []
+_total = len(NODE_LABELS)
 
 for chunk in graph.stream(invoke_state, stream_mode="updates"):
     for node_name, node_output in chunk.items():
         completed.append(node_name)
         if node_output:
             result.update(node_output)
+            if "raw_trades" in node_output:
+                raw_trades_captured = node_output["raw_trades"]
 
-        lines = []
-        for n in completed[:-1]:
-            ic, lb = NODE_LABELS.get(n, ("⚙️", n))
-            lines.append(f"✅ {ic} {lb}")
-        ic, lb = NODE_LABELS.get(node_name, ("⚙️", node_name))
-        lines.append(f"▶️ {ic} **{lb}**")
-        log_area.markdown("\n\n".join(lines))
+        # 메인 화면: 사용자 친화적 메시지 + progress bar
+        status_text.text(STATUS_MESSAGES.get(node_name, "분석 중..."))
+        progress.progress(len(completed) / _total)
 
-# 전체 완료 표시
-lines = []
-for n in completed:
-    ic, lb = NODE_LABELS.get(n, ("⚙️", n))
-    lines.append(f"✅ {ic} {lb}")
-log_area.markdown("\n\n".join(lines))
+        # 사이드바: 개발자용 노드 로그 (현재 노드 ▶️, 완료 ✅, 대기 ○)
+        render_sidebar(completed[:-1], node_name)
+
+        # bybit_fetch 완료 직후 거래건수 메시지로 교체
+        if node_name == "bybit_fetch":
+            closed = len([t for t in raw_trades_captured if t.get("closedPnl", "0") != "0"])
+            if not invoke_state.get("last_fetched_at"):
+                status_text.text(f"거래내역 {closed}건을 분석하는 중...")
+            else:
+                status_text.text(f"기존 데이터를 제외한 신규 {closed}건을 분석하는 중...")
+
+# 완료
+render_sidebar(completed, None)
+status_text.text("✅ 분석 완료!")
+progress.progress(1.0)
 
 # ── 환경 변수 복원 ───────────────────────────────────────────────────────────
 os.environ.pop("TC_SAMPLE_FILE", None)
@@ -83,14 +117,5 @@ st.session_state["last_quiz_question"]   = result.get("quiz_question", "")
 st.session_state["last_quiz_concept"]    = result.get("current_concept", "")
 st.session_state.pop("last_quiz_result",   None)
 st.session_state.pop("last_quiz_feedback", None)
-
-# ── 거래 건수 표시 ───────────────────────────────────────────────────────────
-raw_trades = result.get("raw_trades", [])
-closed     = len([t for t in raw_trades if t.get("closedPnl", "0") != "0"])
-
-if not invoke_state.get("last_fetched_at"):
-    st.info(f"📦 신규 데이터 {closed}건을 분석했습니다.")
-else:
-    st.info(f"📦 기존 데이터를 제외한 신규 데이터 {closed}건을 분석했습니다.")
 
 st.switch_page("pages/3_main.py")

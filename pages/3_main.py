@@ -45,7 +45,7 @@ from ict.ob_detector import detect_ob
 from ict.trend_detector import detect_trendline
 from market.candles import get_candles
 from utils.chart import render_candle_chart
-from utils.constants import NODE_LABELS
+from utils.constants import NODE_LABELS, sidebar_pipeline_md
 
 st.set_page_config(page_title="TradeCoach | 대시보드", page_icon="📊", layout="wide")
 
@@ -80,19 +80,11 @@ for buy in buy_trades:
             used_sells.add(j)
             break
 
-# ── 사이드바: 에이전트 파이프라인 (실행 완료 노드 기반) ──────────────────────
-completed = st.session_state.get("completed_nodes", [])
+# ── 사이드바: 에이전트 파이프라인 (completed_nodes 기반, 정적 렌더) ─────────
+_completed = st.session_state.get("completed_nodes", [])
 
 st.sidebar.divider()
-st.sidebar.caption("🤖 에이전트 파이프라인")
-for node, (icon, label) in NODE_LABELS.items():
-    if node in completed:
-        st.sidebar.markdown(f"✅ {icon} {label}")
-    else:
-        st.sidebar.markdown(
-            f"<span style='color:var(--color-text-tertiary)'>○ {icon} {label}</span>",
-            unsafe_allow_html=True,
-        )
+st.sidebar.empty().markdown(sidebar_pipeline_md(_completed, None))
 
 st.title("📊 TradeCoach 대시보드")
 
