@@ -1,14 +1,32 @@
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from collections import defaultdict
+from datetime import datetime, timezone
 
-# ── 유틸: ms → KST 문자열 ─────────────────────────────────────────────────
+# ── 유틸 함수 ────────────────────────────────────────────────────────────────
+
 def _ms_to_kst(ms) -> str:
     return (
         pd.to_datetime(int(ms), unit="ms", utc=True)
         .tz_convert("Asia/Seoul")
         .strftime("%Y-%m-%d %H:%M")
     )
+
+def _extract_setup(order_id: str) -> str:
+    oid = str(order_id).lower()
+    if oid.startswith("fvg"):    return "FVG"
+    if oid.startswith("ob"):     return "OB"
+    if oid.startswith("sweep"):  return "유동성스윕"
+    if oid.startswith("random"): return "셋업없음"
+    return "기타"
+
+def _pair_label(trade_id: str, buy: dict, sell: dict) -> str:
+    pnl = float(sell.get("closedPnl", 0) or 0)
+    date_kst = _ms_to_kst(buy.get("execTime", 0))[:10]
+    emoji   = "✅" if pnl >= 0 else "❌"
+    pnl_str = f"+${pnl:.2f}" if pnl >= 0 else f"-${abs(pnl):.2f}"
+    return f"{trade_id} | {date_kst} ({emoji} {pnl_str})"
 
 _COL_KO = {
     "execTime":  "체결시간(KST)",
@@ -37,6 +55,27 @@ if "last_result" not in st.session_state:
 
 session_id = st.session_state.get("session_id", "default")
 res        = st.session_state["last_result"]
+
+# ── 전역: Buy/Sell 페어링 ────────────────────────────────────────────────────
+raw_trades  = res.get("raw_trades", [])
+buy_trades  = [t for t in raw_trades if str(t.get("side", "")).lower() == "buy"]
+sell_trades = [t for t in raw_trades if str(t.get("side", "")).lower() == "sell"
+               and str(t.get("closedPnl", "0")) != "0"]
+
+trade_pairs: list[tuple[str, dict, dict]] = []  # (trade_id, buy, sell)
+used_sells: set[int] = set()
+sym_counter: dict[str, int] = {}
+for buy in buy_trades:
+    for j, sell in enumerate(sell_trades):
+        if j in used_sells:
+            continue
+        if buy.get("symbol") == sell.get("symbol"):
+            sym = buy.get("symbol", "XXX")
+            sym_counter[sym] = sym_counter.get(sym, 0) + 1
+            trade_id = f"{sym[:3]}-{sym_counter[sym]:03d}"
+            trade_pairs.append((trade_id, buy, sell))
+            used_sells.add(j)
+            break
 
 st.title("📊 TradeCoach 대시보드")
 
@@ -142,29 +181,29 @@ with tab1:
 with tab2:
     st.subheader("📋 거래내역")
 
-    raw_trades = res.get("raw_trades", [])
-
-    # journal_entries가 비어있을 경우 raw_trades에서 청산 거래 필터링
-    journal_entries = st.session_state.get("last_journal_entries", [])
-
-    # 복기에 사용할 트레이드 쌍 구성 (buy + sell 매칭)
-    buy_trades  = [t for t in raw_trades if str(t.get("side", "")).lower() == "buy"]
-    sell_trades = [t for t in raw_trades if str(t.get("side", "")).lower() == "sell"
-                   and str(t.get("closedPnl", "0")) != "0"]
-
-    trade_pairs: list[tuple[dict, dict]] = []
-    used_sells: set[int] = set()
-    for buy in buy_trades:
-        for j, sell in enumerate(sell_trades):
-            if j in used_sells:
-                continue
-            if buy.get("symbol") == sell.get("symbol"):
-                trade_pairs.append((buy, sell))
-                used_sells.add(j)
-                break
-
-    # ── 거래 테이블 표시 ──────────────────────────────────────────────────────
-    if raw_trades:
+    # ── Buy/Sell 페어링 테이블 ───────────────────────────────────────────────
+    if trade_pairs:
+        rows = []
+        for tid, buy, sell in trade_pairs:
+            pnl = float(sell.get("closedPnl", 0) or 0)
+            entry_price = float(buy.get("execPrice", 0) or 0)
+            exit_price  = float(sell.get("execPrice", 0) or 0)
+            qty         = float(buy.get("orderQty", 0) or 0)
+            ret_pct     = (exit_price - entry_price) / entry_price * 100 if entry_price else 0
+            rows.append({
+                "거래번호":      tid,
+                "종목":          buy.get("symbol", ""),
+                "진입가":        entry_price,
+                "청산가":        exit_price,
+                "수량":          qty,
+                "실현손익":      pnl,
+                "수익률(%)":     round(ret_pct, 2),
+                "진입시각(KST)": _ms_to_kst(buy.get("execTime", 0)),
+                "청산시각(KST)": _ms_to_kst(sell.get("execTime", 0)),
+                "결과":          "✅ WIN" if pnl >= 0 else "❌ LOSS",
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True)
+    elif raw_trades:
         df_trades = pd.DataFrame(raw_trades)
         display_cols = [c for c in ["execTime", "symbol", "side", "execPrice", "orderQty", "closedPnl"] if c in df_trades.columns]
         df_display = df_trades[display_cols].copy() if display_cols else df_trades.copy()
@@ -176,6 +215,7 @@ with tab2:
         st.caption("거래내역 없음")
 
     # ── 매매일지 (journal_entries 기반) ──────────────────────────────────────
+    journal_entries = st.session_state.get("last_journal_entries", [])
     if journal_entries:
         journal_entries = sorted(journal_entries, key=lambda x: x.get("date", ""))
         st.divider()
@@ -198,20 +238,17 @@ with tab2:
     if not trade_pairs:
         st.caption("복기할 트레이드 쌍이 없습니다. (raw_trades에 Buy/Sell 쌍 필요)")
     else:
-        pair_labels = [
-            f"{b.get('symbol')} | 진입 {b.get('execPrice')} → 청산 {s.get('execPrice')}  PnL={s.get('closedPnl', '?')}"
-            for b, s in trade_pairs
-        ]
+        pair_labels = [_pair_label(tid, b, s) for tid, b, s in trade_pairs]
         selected_label = st.selectbox("트레이드 선택", pair_labels, key="replay_select")
         sel_idx = pair_labels.index(selected_label)
 
         if st.button("▶ 복기 시작", type="primary", key="replay_btn"):
-            buy_t, sell_t = trade_pairs[sel_idx]
+            sel_trade_id, buy_t, sell_t = trade_pairs[sel_idx]
             symbol   = buy_t.get("symbol", "BTCUSDT")
             entry_ms = int(buy_t.get("execTime",  0))
             exit_ms  = int(sell_t.get("execTime", 0))
 
-            # ── 캔들 캐싱 (동일 거래 재선택 시 API 재호출 방지) ──────────────
+            # 캔들 캐싱
             cache_key = f"replay_{buy_t.get('orderId', str(entry_ms))}"
             if cache_key not in st.session_state:
                 with st.spinner("캔들 데이터 수집 중..."):
@@ -219,7 +256,7 @@ with tab2:
             candles = st.session_state[cache_key]
             fvgs    = detect_fvg(candles)
 
-            # ── Plotly Figure 구성 (FVG 오버레이) ────────────────────────────
+            # Plotly Figure (FVG 오버레이)
             df_c = pd.DataFrame(candles)
             df_c["dt"] = pd.to_datetime(df_c["timestamp"], unit="ms", utc=True)
 
@@ -246,7 +283,6 @@ with tab2:
                     layer="below",
                 )
 
-            from datetime import datetime, timezone
             entry_dt  = datetime.fromtimestamp(entry_ms / 1000, tz=timezone.utc)
             exit_dt   = datetime.fromtimestamp(exit_ms  / 1000, tz=timezone.utc)
             entry_row = df_c[df_c["timestamp"] <= entry_ms].tail(1)
@@ -272,7 +308,12 @@ with tab2:
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            # ── FVG 결과 텍스트 ───────────────────────────────────────────────
+            # 자동 셋업 태깅
+            auto_setup = "FVG" if fvgs else "확인필요"
+            st.session_state[f"setup_tag_{sel_trade_id}"] = auto_setup
+            st.badge(f"자동 감지 셋업: {auto_setup}")
+
+            # FVG 결과 텍스트
             if fvgs:
                 st.markdown(f"**FVG 감지: {len(fvgs)}개**")
                 for fvg in fvgs:
@@ -282,7 +323,7 @@ with tab2:
             else:
                 st.info("이 구간에서 FVG가 탐지되지 않았습니다.")
 
-            # ── LLM 복기 코멘트 ───────────────────────────────────────────────
+            # LLM 복기 코멘트
             pnl = float(sell_t.get("closedPnl", 0) or 0)
             selected_trade = {
                 "symbol":      symbol,
@@ -315,18 +356,18 @@ with tab3:
     c2.metric("익절", len(win_trades))
     c3.metric("손절", len(loss_trades))
 
-    # ── 섹션 2: 셋업별 수익률 차트 ─────────────────────────────────────────
-    # setup_analysis가 비어있으면 journal_entries의 symbol 기준으로 파생
-    if not setup_analysis and journal_entries:
-        from collections import defaultdict
+    # ── 섹션 2: 셋업별 수익률 (orderId prefix 기반) ─────────────────────────
+    if not setup_analysis and trade_pairs:
         ret_by_setup: dict[str, list[float]] = defaultdict(list)
-        for e in journal_entries:
-            sym = e.get("symbol", "기타")
-            rr  = float(e.get("rr", 0) or 0)
-            ret_by_setup[sym].append(rr)
+        for _, buy, sell in trade_pairs:
+            setup       = _extract_setup(buy.get("orderId", ""))
+            entry_price = float(buy.get("execPrice", 1) or 1)
+            exit_price  = float(sell.get("execPrice", 0) or 0)
+            ret_pct     = (exit_price - entry_price) / entry_price * 100
+            ret_by_setup[setup].append(ret_pct)
         setup_analysis = {
-            sym: round(sum(vals) / len(vals), 4)
-            for sym, vals in ret_by_setup.items()
+            s: round(sum(v) / len(v), 4)
+            for s, v in ret_by_setup.items()
         }
 
     best_setup  = max(setup_analysis, key=setup_analysis.get) if setup_analysis else ""
@@ -366,31 +407,13 @@ with tab3:
     st.divider()
     st.subheader("🏷️ 거래 차트 태깅")
 
-    raw_trades_t3 = res.get("raw_trades", [])
-    buy_t3  = [t for t in raw_trades_t3 if str(t.get("side", "")).lower() == "buy"]
-    sell_t3 = [t for t in raw_trades_t3 if str(t.get("side", "")).lower() == "sell"]
-
-    tag_pairs: list[tuple[dict, dict]] = []
-    used: set[int] = set()
-    for b in buy_t3:
-        for j, s in enumerate(sell_t3):
-            if j in used:
-                continue
-            if b.get("symbol") == s.get("symbol"):
-                tag_pairs.append((b, s))
-                used.add(j)
-                break
-
-    if not tag_pairs:
+    if not trade_pairs:
         st.caption("표시할 트레이드 쌍이 없습니다.")
     else:
-        tag_labels = [
-            f"{b.get('symbol')} | {_ms_to_kst(b.get('execTime', 0))} → {_ms_to_kst(s.get('execTime', 0))}"
-            for b, s in tag_pairs
-        ]
+        tag_labels = [_pair_label(tid, b, s) for tid, b, s in trade_pairs]
         selected_tag = st.selectbox("트레이드 선택", tag_labels, key="tag_select")
         idx = tag_labels.index(selected_tag)
-        buy_trade, sell_trade = tag_pairs[idx]
+        sel_tid_t3, buy_trade, sell_trade = trade_pairs[idx]
 
         symbol   = buy_trade.get("symbol", "BTCUSDT")
         entry_ms = int(buy_trade.get("execTime", 0))
@@ -406,15 +429,21 @@ with tab3:
             st.warning("execTime 정보가 없어 차트를 표시할 수 없습니다.")
 
         st.divider()
+        auto_tag = st.session_state.get(f"setup_tag_{sel_tid_t3}", "")
         col1, col2 = st.columns(2)
         with col1:
+            setup_options = ["FVG", "OB", "유동성스윕", "추세추종", "확인필요", "셋업없음"]
+            default_idx   = setup_options.index(auto_tag) if auto_tag in setup_options else 0
+            label_text    = f"셋업 태그{' (자동)' if auto_tag else ''}"
             setup_tag = st.selectbox(
-                "셋업 태그",
-                ["FVG", "OB", "유동성스윕", "브레이커", "기타"],
+                label_text,
+                setup_options,
+                index=default_idx,
                 key=f"setup_{idx}",
             )
         with col2:
             note = st.text_input("메모", key=f"note_{idx}", placeholder="진입 근거 등")
 
         if st.button("💾 저장", key=f"save_{idx}"):
+            st.session_state[f"setup_tag_{sel_tid_t3}"] = setup_tag
             st.success(f"저장 완료: {symbol} | {setup_tag} | {note}")
