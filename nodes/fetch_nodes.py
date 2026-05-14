@@ -108,9 +108,12 @@ def _fetch_from_api(api_key: str, api_secret: str) -> list[dict]:
 
 
 def _load_sample() -> list[dict]:
+    override = os.environ.get("TC_SAMPLE_FILE", "")
+    path = Path(override) if override else _SAMPLE_PATH
     try:
-        data = json.loads(_SAMPLE_PATH.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
+        logger.info("bybit_fetch_node: loaded sample from %s", path.name)
         return data.get("result", {}).get("list", [])
     except Exception as e:
-        logger.warning("bybit_fetch_node: failed to load sample: %s", e)
+        logger.warning("bybit_fetch_node: failed to load sample (%s): %s", path, e)
         return []
