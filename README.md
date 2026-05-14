@@ -1,125 +1,122 @@
-# TradeCoach
-AI 기반 트레이딩 코치 에이전트.
-Bybit API로 매매내역을 자동 수집하고
-매매일지 → 성과분석 → ICT 코칭 루프를 제공합니다.
+# TradeCoach v2.1
 
-## 핵심 기능
-- Bybit API 자동 수집 (없으면 샘플 데이터)
-- 신규 KPI: 수익률 / 기대값 / 손절 일관성
-- ICT 개념 기반 약점 코칭 (25개 사전)
-- SQLite 세션 간 메모리
+AI 기반 트레이딩 복기 코치.  
+Bybit API로 매매내역을 자동 수집하고  
+**캔들 복기 뷰어 + FVG 탐지 + LLM 코칭 루프**를 제공합니다.
 
-## 설치 및 실행
+---
+
+## 핵심 기능 (v2.1)
+
+| 기능 | 설명 |
+|------|------|
+| 🔑 API 연결 / 샘플 체험 | Bybit API Key 입력 또는 샘플 데이터로 즉시 시작 |
+| 📊 KPI 대시보드 | 승률 / 평균 수익률 / 기대값 / 손절 일관성 |
+| 📈 캔들 복기 뷰어 | 진입 전후 캔들 + 진입/청산 마커 (Plotly) |
+| 🟡 FVG 탐지 (rule-based) | Fair Value Gap 자동 탐지 + 차트 오버레이 |
+| 🤖 LLM 복기 코멘트 | ICT 관점 진단 + 개선 제안 (GPT-4o-mini) |
+| 📚 셋업 태깅 | 셋업별 수익률 분석 + 개선 제안 생성 |
+
+---
+
+## 설치
+
 ```bash
+# Python 3.13 필요
 uv venv && source .venv/bin/activate
 uv sync
 ```
 
-### Jupyter
-```bash
-jupyter notebook final_notebook.ipynb
-```
-
-### Streamlit
-```bash
-streamlit run streamlit_app.py
-```
-
 ## 환경 설정
-`.env` 파일 생성 (`.env.example` 참고)
 
-## 프로젝트 구조
+```bash
+cp .env.example .env
+# .env에 키 입력:
+# OPENAI_API_KEY=sk-...
+# BYBIT_API_KEY=...      (선택 — 없으면 샘플 데이터 모드)
+# BYBIT_API_SECRET=...   (선택)
 ```
-trade-coach/
-├── graph.py          # TradeCoachState + 그래프 정의
-├── config.py
-├── db.py
-├── nodes/            # 각 노드 구현 (.py)
-├── tools/
-├── data/
-├── streamlit_app.py
-└── final_notebook.ipynb
+
+## 실행
+
+```bash
+# 멀티페이지 Streamlit 앱
+uv run streamlit run streamlit_app.py
+```
+
+앱이 열리면 자동으로 **API 입력 페이지**로 이동합니다.
+
+```
+1. API Key 입력 또는 "샘플 데이터로 체험하기" 클릭
+2. 로딩 화면에서 데이터 수집 + 분석 진행
+3. 메인 대시보드 3탭 확인
+   - Tab 1: KPI 대시보드
+   - Tab 2: 거래내역 리스트 + 복기 뷰어 (캔들차트 + FVG + LLM 코멘트)
+   - Tab 3: 셋업 태깅 (수익률 분석 + 개선 제안)
 ```
 
 ---
 
-## Future Roadmap
+## 스크린샷
 
-TradeCoach는 단순 성과 분석기를 넘어
-**AI 기반 트레이딩 저널 + 복기 코치**로 진화합니다.
+> _[placeholder] 1_api_input 페이지_
+
+> _[placeholder] 2_loading 페이지 (progress bar)_
+
+> _[placeholder] Tab 2 복기 뷰어 (캔들차트 + FVG 오버레이 + LLM 코멘트)_
+
+> _[placeholder] Tab 3 셋업 태깅 (bar_chart + 개선 제안)_
+
+---
+
+## 프로젝트 구조
+
+```
+trade-coach-v3/
+├── streamlit_app.py        # 진입점 → pages/1_api_input.py 리다이렉트
+├── pages/
+│   ├── 1_api_input.py      # API 연결 / 샘플 시작
+│   ├── 2_loading.py        # 데이터 수집 + graph.invoke
+│   └── 3_main.py           # KPI / 복기 뷰어 / 셋업 태깅
+├── graph.py                # TradeCoachState + LangGraph 정의
+├── nodes/                  # 노드 구현
+│   ├── fetch_nodes.py
+│   ├── preprocess_nodes.py
+│   ├── analysis_nodes.py
+│   ├── coaching_nodes.py   # backtest_coach + setup suggestion
+│   ├── replay_coach_node.py  # LLM 복기 코멘트
+│   └── ...
+├── ict/
+│   └── fvg_detector.py     # Rule-based FVG 탐지
+├── market/
+│   └── candles.py          # Bybit Kline API
+├── utils/
+│   └── chart.py            # Plotly 캔들차트 렌더러
+├── data/
+│   └── sample_trades.json  # 샘플 거래 데이터
+├── tools/
+└── db.py
+```
+
+---
+
+## 개발 로드맵
 
 | 버전 | 목표 | 상태 |
 |------|------|------|
-| v2.0 | MVP 안정화 (현재) | ✅ 완료 |
-| v2.1 | Replay Foundation — 거래 시점 캔들 복원 | 🔜 예정 |
-| v2.2 | ICT Detector — FVG/OB/MSS 자동 탐지 | 🔜 예정 |
-| v2.3 | Replay Coach — candle-by-candle 복기 코칭 | 🔜 예정 |
-| v3.0 | A+ Setup Memory — 개인별 우수 셋업 라이브러리 | 🔜 예정 |
-
-> 위 기능들은 아직 구현되지 않았습니다.
-> 현재 지원 기능은 상단 "핵심 기능" 섹션을 참고하세요.
-
-자세한 로드맵은 [FUTURE_ROADMAP.md](./FUTURE_ROADMAP.md)를 참고하세요.
+| v2.0 | MVP 안정화 | ✅ 완료 |
+| v2.1 | Replay Foundation — 복기 뷰어 + FVG 탐지 | ✅ 완료 |
+| v2.2 | ICT Detector — OB/MSS/Liquidity 추가 탐지 | 🔜 예정 |
+| v2.3 | Replay Coach — candle-by-candle 복기 | 🔜 예정 |
+| v3.0 | A+ Setup Memory — 개인 셋업 라이브러리 | 🔜 예정 |
 
 ---
 
 ## 문서 체계
 
-| 문서 | 역할 | 대상 독자 |
-|------|------|---------|
-| README.md | 설치/실행 가이드 | 처음 사용자 |
-| TRADECOACH_AGENT_OVERVIEW.md | 서비스 상세 소개 | 기능 파악 원하는 사람 |
-| FUTURE_ROADMAP.md | v2.1~v3 개발 계획 | 기여자/개발자 |
-| NEXT_BRANCH_PLAN.md | 브랜치 전략 | 개발자 |
-| docs/01_LangGraph_상세_노드_설계서_v2.0.docx | 노드 설계 명세 | 개발자 |
-| docs/04_MVP_API_명세서_v2.1.docx | API/State 명세 | 개발자 |
-| docs/05_MVP_DB_스키마_설계서_v2.1.docx | DB 스키마 | 개발자 |
-| docs/06_배포후_최소회귀_테스트_체크리스트_v0.3.docx | 배포 체크리스트 | 운영자 |
-
----
-
-## 문서 체계 전체 구조
-
-### 읽는 순서
-
-```
-처음 사용자:
-  README.md
-    → TRADECOACH_AGENT_OVERVIEW.md
-
-개발 참여:
-  README.md
-    → docs/09_프로젝트_작업_지침_v2.0.docx
-    → docs/01_LangGraph_상세_노드_설계서_v2.1.docx
-    → docs/04_MVP_API_명세서_v2.1.docx
-    → docs/05_MVP_DB_스키마_설계서_v2.1.docx
-
-차세대 기능 개발:
-  FUTURE_ROADMAP.md
-    → NEXT_BRANCH_PLAN.md
-
-배포/운영:
-  docs/06_배포후_최소회귀_테스트_체크리스트_v0.3.docx
-```
-
-### 문서 역할 분리
-
-```
-서비스 소개 레이어:
-  README.md ──────────────── 설치/실행 (간결)
-  AGENT_OVERVIEW.md ───────── 기능 상세 (풍부)
-
-개발 설계 레이어:
-  docs/01 노드 설계서 ──────── LangGraph 구조
-  docs/04 API 명세서 ──────── State/노드 인터페이스
-  docs/05 DB 스키마 ───────── 데이터 구조
-  docs/09 작업 지침 ───────── 코딩 원칙/브랜치
-
-개발 전략 레이어:
-  FUTURE_ROADMAP.md ──────── v2.1~v3 방향
-  NEXT_BRANCH_PLAN.md ────── 브랜치 전략
-
-운영 레이어:
-  docs/06 체크리스트 ──────── 배포 검증
-  docs/07 개발보고서 ──────── 이력 기록
-```
+| 문서 | 역할 |
+|------|------|
+| `DECISION_LOG.md` | 아키텍처 결정 이력 |
+| `FUTURE_ROADMAP.md` | v2.2~v3 개발 계획 |
+| `docs/09_프로젝트_작업_지침_v2.1.docx` | 코딩 원칙 / 브랜치 전략 |
+| `docs/01_LangGraph_상세_노드_설계서_v2.1.docx` | 노드 설계 명세 |

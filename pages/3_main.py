@@ -4,6 +4,7 @@ import streamlit as st
 
 from nodes.quiz_nodes import evaluate_quiz
 from nodes.replay_coach_node import replay_coach_node
+from nodes.coaching_nodes import generate_setup_suggestion
 from ict.fvg_detector import detect_fvg
 from market.candles import get_candles
 from utils.chart import render_candle_chart
@@ -265,36 +266,105 @@ with tab2:
 with tab3:
     st.subheader("📚 셋업 태깅")
 
-    trades = res.get("raw_trades", [])
-    buy_trades  = [t for t in trades if str(t.get("side", "")).lower() == "buy"]
-    sell_trades = [t for t in trades if str(t.get("side", "")).lower() == "sell"]
+    journal_entries = st.session_state.get("last_journal_entries", [])
+    setup_analysis  = st.session_state.get("last_setup", {})
 
-    trade_pairs = []
-    for buy in buy_trades:
-        for sell in sell_trades:
-            if buy.get("symbol") == sell.get("symbol"):
-                trade_pairs.append((buy, sell))
+    win_trades  = [t for t in journal_entries if t.get("result") == "win"]
+    loss_trades = [t for t in journal_entries if t.get("result") == "loss"]
+
+    # ── 섹션 1: 익절/손절 분류 요약 ────────────────────────────────────────
+    c1, c2, c3 = st.columns(3)
+    c1.metric("전체 거래", len(journal_entries))
+    c2.metric("익절", len(win_trades))
+    c3.metric("손절", len(loss_trades))
+
+    # ── 섹션 2: 셋업별 수익률 차트 ─────────────────────────────────────────
+    # setup_analysis가 비어있으면 journal_entries의 symbol 기준으로 파생
+    if not setup_analysis and journal_entries:
+        from collections import defaultdict
+        ret_by_setup: dict[str, list[float]] = defaultdict(list)
+        for e in journal_entries:
+            sym = e.get("symbol", "기타")
+            rr  = float(e.get("rr", 0) or 0)
+            ret_by_setup[sym].append(rr)
+        setup_analysis = {
+            sym: round(sum(vals) / len(vals), 4)
+            for sym, vals in ret_by_setup.items()
+        }
+
+    best_setup  = max(setup_analysis, key=setup_analysis.get) if setup_analysis else ""
+    worst_setup = min(setup_analysis, key=setup_analysis.get) if setup_analysis else ""
+
+    if setup_analysis:
+        st.subheader("📈 셋업별 평균 수익률")
+        df_setup = pd.DataFrame(
+            list(setup_analysis.items()), columns=["셋업", "평균 수익률 (%)"]
+        ).set_index("셋업")
+        st.bar_chart(df_setup)
+
+        if best_setup:
+            st.success(f"가장 많이 수익난 셋업: **{best_setup}** ({setup_analysis[best_setup]:.2f}%)")
+        if worst_setup and worst_setup != best_setup:
+            st.error(f"가장 많이 손실난 셋업: **{worst_setup}** ({setup_analysis[worst_setup]:.2f}%)")
+    else:
+        st.info("셋업 분석 데이터가 없습니다. 거래 내역을 먼저 분석해주세요.")
+
+    # ── 섹션 3: LLM 개선 제안 ─────────────────────────────────────────────
+    if setup_analysis:
+        if st.button("💡 개선 제안 생성", key="tab3_suggest_btn"):
+            with st.spinner("LLM 분석 중..."):
+                suggestion = generate_setup_suggestion(
+                    win_count=len(win_trades),
+                    loss_count=len(loss_trades),
+                    best_setup=best_setup,
+                    worst_setup=worst_setup,
+                    setup_analysis=setup_analysis,
+                )
+            st.session_state["tab3_suggestion"] = suggestion
+
+        if "tab3_suggestion" in st.session_state:
+            st.info(st.session_state["tab3_suggestion"])
+
+    # ── 섹션 4: 차트 태깅 ──────────────────────────────────────────────────
+    st.divider()
+    st.subheader("🏷️ 거래 차트 태깅")
+
+    raw_trades_t3 = res.get("raw_trades", [])
+    buy_t3  = [t for t in raw_trades_t3 if str(t.get("side", "")).lower() == "buy"]
+    sell_t3 = [t for t in raw_trades_t3 if str(t.get("side", "")).lower() == "sell"]
+
+    tag_pairs: list[tuple[dict, dict]] = []
+    used: set[int] = set()
+    for b in buy_t3:
+        for j, s in enumerate(sell_t3):
+            if j in used:
+                continue
+            if b.get("symbol") == s.get("symbol"):
+                tag_pairs.append((b, s))
+                used.add(j)
                 break
 
-    if not trade_pairs:
+    if not tag_pairs:
         st.caption("표시할 트레이드 쌍이 없습니다.")
     else:
-        pair_labels = [
+        tag_labels = [
             f"{b.get('symbol')} | {b.get('execTime')} → {s.get('execTime')}"
-            for b, s in trade_pairs
+            for b, s in tag_pairs
         ]
-        selected = st.selectbox("트레이드 선택", pair_labels)
-        idx = pair_labels.index(selected)
-        buy_trade, sell_trade = trade_pairs[idx]
+        selected_tag = st.selectbox("트레이드 선택", tag_labels, key="tag_select")
+        idx = tag_labels.index(selected_tag)
+        buy_trade, sell_trade = tag_pairs[idx]
 
-        symbol       = buy_trade.get("symbol", "BTCUSDT")
-        entry_ms     = int(buy_trade.get("execTime", 0))
-        exit_ms      = int(sell_trade.get("execTime", 0))
+        symbol   = buy_trade.get("symbol", "BTCUSDT")
+        entry_ms = int(buy_trade.get("execTime", 0))
+        exit_ms  = int(sell_trade.get("execTime", 0))
 
         if entry_ms > 0:
-            with st.spinner("캔들 데이터 수집 중..."):
-                candles = get_candles(symbol, entry_ms, interval="15", limit=50)
-            render_candle_chart(candles, entry_ms, exit_ms, symbol)
+            cache_key_t3 = f"tag_candles_{buy_trade.get('orderId', str(entry_ms))}"
+            if cache_key_t3 not in st.session_state:
+                with st.spinner("캔들 데이터 수집 중..."):
+                    st.session_state[cache_key_t3] = get_candles(symbol, entry_ms, interval="15", limit=50)
+            render_candle_chart(st.session_state[cache_key_t3], entry_ms, exit_ms, symbol)
         else:
             st.warning("execTime 정보가 없어 차트를 표시할 수 없습니다.")
 

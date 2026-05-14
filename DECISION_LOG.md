@@ -101,3 +101,48 @@
 | avg_return_rate | closedPnl/execValue×100 | 투자금 대비 수익률 |
 | expected_value | (승률×평균수익) - (패율×평균손실) | 전략 장기 수익성 |
 | loss_consistency | 손실 표준편차/평균손실 | 손절 규율 |
+
+---
+
+## 2026-05-14 (Day 5 완료)
+
+### Decision 7: 셋업 태깅 탭 데이터 소스 우선순위
+**결정:** setup_analysis(그래프 상태) > journal_entries 파생 > raw_trades 파생 순으로 폴백
+
+**이유:**
+- bybit 모드에서는 preprocess_node가 symbol → setup 파생 → setup_analysis 존재
+- journal 모드(CSV 직접 입력)도 setup 컬럼 있으면 setup_analysis 존재
+- 두 경우 모두 setup_analysis가 가장 신뢰할 수 있는 데이터
+- journal_entries 파생은 rr 필드 기반이므로 정확도 낮음 (폴백만 사용)
+
+**트레이드오프:**
+- 샘플 데이터에서 setup_analysis 비어있으면 symbol 기준 그룹화로 대체
+- 셋업 이름이 BTC/ETH/SOL 등 심볼명으로 표시될 수 있음
+
+---
+
+### Decision 8: LLM 호출 위치 원칙 확정
+**결정:** 모든 LLM 호출은 nodes/ 파일에서만. pages/는 node 함수를 호출만 함
+
+**이유:**
+- 테스트 가능성: nodes/ 단위로 dotenv 로드 후 독립 테스트 가능
+- 재사용성: 같은 LLM 로직을 다른 페이지/그래프에서 호출 가능
+- 책임 분리: UI 코드(pages/)와 비즈니스 로직(nodes/)을 분리
+
+**적용 범위:**
+| 페이지 | 호출 노드 |
+|--------|-----------|
+| Tab 2 복기 뷰어 | nodes/replay_coach_node.py |
+| Tab 3 개선 제안 | nodes/coaching_nodes.generate_setup_suggestion |
+
+---
+
+### Decision 9: session_state 캐싱 정책
+**결정:** Kline API 호출 결과는 `f"replay_{orderId}"` 키로 캐싱
+
+**이유:**
+- Bybit Kline API는 무료지만 반복 호출 시 UX 저하 (1~2초 지연)
+- 같은 거래 재선택 시 API 재호출 불필요
+- session_state는 브라우저 탭 단위로 유효 → 앱 재시작 시 자동 초기화
+
+**범위:** Tab 2 복기 뷰어(`replay_` prefix), Tab 3 차트 태깅(`tag_candles_` prefix)

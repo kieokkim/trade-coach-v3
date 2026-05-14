@@ -205,3 +205,43 @@ def fallback_classify_node(state: dict) -> dict:
         session_id, tag, fallback_type,
     )
     return {"fallback_type": fallback_type, "messages": messages}
+
+
+# ───────────────────────── generate_setup_suggestion ────────────────────────
+
+_SETUP_SUGGESTION_SYSTEM = """\
+당신은 ICT(Inner Circle Trader) 전문 트레이딩 코치입니다.
+트레이더의 셋업별 수익률 데이터를 보고 개선 제안을 한국어 1~2문장으로 작성하세요.
+가장 수익난 셋업을 강화하고, 가장 손실난 셋업의 개선점을 구체적으로 제시하세요."""
+
+
+def generate_setup_suggestion(
+    win_count: int,
+    loss_count: int,
+    best_setup: str,
+    worst_setup: str,
+    setup_analysis: dict,
+) -> str:
+    total = win_count + loss_count
+    win_rate = win_count / total if total > 0 else 0.0
+
+    setup_summary = ", ".join(
+        f"{k}: {v:.2f}%" for k, v in sorted(setup_analysis.items(), key=lambda x: -x[1])
+    )
+    user_content = (
+        f"전체 {total}건 | 익절 {win_count}건 | 손절 {loss_count}건 | 승률 {win_rate:.1%}\n"
+        f"셋업별 수익률: {setup_summary}\n"
+        f"최고 셋업: {best_setup or '없음'} | 최악 셋업: {worst_setup or '없음'}"
+    )
+
+    try:
+        msg = _get_coach_llm().invoke([
+            {"role": "system", "content": _SETUP_SUGGESTION_SYSTEM},
+            {"role": "user",   "content": user_content},
+        ])
+        return msg.content.strip()
+    except Exception as e:
+        logger.warning("generate_setup_suggestion LLM error: %s", e)
+        if best_setup and worst_setup:
+            return f"{best_setup} 셋업을 강화하고 {worst_setup} 셋업 진입 기준을 재점검하세요."
+        return "데이터 부족으로 제안을 생성할 수 없습니다."
