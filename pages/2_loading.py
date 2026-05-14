@@ -47,7 +47,8 @@ log_area   = st.empty()
 for chunk in graph.stream(invoke_state, stream_mode="updates"):
     for node_name, node_output in chunk.items():
         completed.append(node_name)
-        result.update(node_output)
+        if node_output:
+            result.update(node_output)
 
         lines = []
         for n in completed[:-1]:
