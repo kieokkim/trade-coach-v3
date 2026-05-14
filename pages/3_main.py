@@ -1,0 +1,183 @@
+import pandas as pd
+import streamlit as st
+
+from nodes.quiz_nodes import evaluate_quiz
+
+st.set_page_config(page_title="TradeCoach | 대시보드", page_icon="📊", layout="wide")
+
+# ── 결과 없으면 API 입력 페이지로 ──────────────────────────────────────────
+if "last_result" not in st.session_state:
+    st.info("분석 결과가 없습니다. API 입력 페이지에서 시작해주세요.")
+    if st.button("← API 입력 페이지로"):
+        st.switch_page("pages/1_api_input.py")
+    st.stop()
+
+session_id = st.session_state.get("session_id", "default")
+res        = st.session_state["last_result"]
+
+st.title("📊 TradeCoach 대시보드")
+
+tab1, tab2, tab3 = st.tabs(["📊 KPI 대시보드", "📋 거래내역 리스트", "📚 셋업 태깅"])
+
+# ═══════════════════════════ Tab 1: KPI 대시보드 ════════════════════════════
+
+with tab1:
+    stats = st.session_state.get("last_stats", {})
+
+    st.subheader("📌 핵심 지표")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("승률",        f"{stats.get('win_rate', 0):.1%}")
+    c2.metric("평균 수익률", f"{stats.get('avg_return_rate', 0):.2f}%")
+    c3.metric("기대값",       f"{stats.get('expected_value', 0):.2f}%")
+    c4.metric("손절 일관성", f"{stats.get('loss_consistency', 0):.2f}")
+
+    weaknesses = st.session_state.get("last_weaknesses", [])
+    if weaknesses:
+        st.subheader("⚠️ 감지된 약점")
+        for w in weaknesses:
+            st.info(w)
+
+    action_rule = st.session_state.get("last_action_rule", "")
+    if action_rule:
+        st.subheader("★ 내일의 규칙")
+        st.success(action_rule)
+
+    setup_analysis = st.session_state.get("last_setup", {})
+    if setup_analysis:
+        st.subheader("📈 셋업별 수익률")
+        df_setup = pd.DataFrame(
+            list(setup_analysis.items()),
+            columns=["셋업", "평균 수익률 (%)"],
+        ).set_index("셋업")
+        st.bar_chart(df_setup)
+
+    coaching = st.session_state.get("last_coaching", "")
+    if coaching:
+        st.subheader("💬 코칭 피드백")
+        st.write(coaching)
+
+    # 퀴즈
+    quiz_question = st.session_state.get("last_quiz_question", "")
+    if quiz_question:
+        st.divider()
+        st.subheader("🧠 개념 확인 퀴즈")
+        st.write(f"**{quiz_question}**")
+
+        quiz_result = st.session_state.get("last_quiz_result", "")
+
+        if not quiz_result:
+            quiz_answer = st.text_input(
+                "답변을 입력하세요",
+                key="quiz_answer_input",
+                placeholder="자유롭게 답변해주세요",
+            )
+            if st.button("📝 답변 제출", key="submit_quiz"):
+                if quiz_answer.strip():
+                    with st.spinner("답변 평가 중..."):
+                        result, feedback = evaluate_quiz(
+                            session_id=session_id,
+                            quiz_question=quiz_question,
+                            quiz_answer=quiz_answer,
+                            current_concept=st.session_state.get("last_quiz_concept", ""),
+                            retry_count=st.session_state.get("quiz_retry_count", 0),
+                        )
+                    st.session_state["last_quiz_result"]   = result
+                    st.session_state["last_quiz_feedback"] = feedback
+                    st.rerun()
+                else:
+                    st.warning("답변을 입력해주세요.")
+        else:
+            feedback = st.session_state.get("last_quiz_feedback", "")
+            if quiz_result == "pass":
+                st.success(f"✅ 정답! {feedback}")
+            else:
+                st.error(f"❌ 다시 생각해보세요. {feedback}")
+                if st.button("🔄 다시 시도", key="retry_quiz"):
+                    retry = st.session_state.get("quiz_retry_count", 0) + 1
+                    st.session_state["quiz_retry_count"] = retry
+                    st.session_state.pop("last_quiz_result",   None)
+                    st.session_state.pop("last_quiz_feedback", None)
+                    st.rerun()
+
+# ════════════════════════ Tab 2: 거래내역 리스트 ════════════════════════════
+
+with tab2:
+    st.subheader("📋 거래내역")
+
+    raw_trades = res.get("raw_trades", [])
+    if raw_trades:
+        df_trades = pd.DataFrame(raw_trades)
+        display_cols = [c for c in ["execTime", "symbol", "side", "execPrice", "orderQty", "closedPnl", "stopOrderType"] if c in df_trades.columns]
+        st.dataframe(df_trades[display_cols] if display_cols else df_trades, use_container_width=True)
+    else:
+        st.caption("거래내역 없음")
+
+    journal_entries = st.session_state.get("last_journal_entries", [])
+    if journal_entries:
+        st.divider()
+        st.subheader("📒 매매일지")
+        for entry in journal_entries:
+            label = (
+                f"{entry.get('date', '')} | "
+                f"{entry.get('symbol', '')} | "
+                f"{'✅ 승' if entry.get('result') == 'win' else '❌ 패'}"
+            )
+            with st.expander(label):
+                st.write(f"**진입 근거**: {entry.get('entry_reason', '') or '추론 불가'}")
+                st.write(f"**청산 근거**: {entry.get('exit_reason', '') or '추론 불가'}")
+                st.write(f"**회고**: {entry.get('reflection', '') or '-'}")
+
+# ═══════════════════════════ Tab 3: 셋업 태깅 ══════════════════════════════
+
+with tab3:
+    st.subheader("📚 셋업 태깅")
+
+    from market.candles import get_candles
+    from utils.chart import render_candle_chart
+
+    trades = res.get("raw_trades", [])
+    buy_trades  = [t for t in trades if str(t.get("side", "")).lower() == "buy"]
+    sell_trades = [t for t in trades if str(t.get("side", "")).lower() == "sell"]
+
+    trade_pairs = []
+    for buy in buy_trades:
+        for sell in sell_trades:
+            if buy.get("symbol") == sell.get("symbol"):
+                trade_pairs.append((buy, sell))
+                break
+
+    if not trade_pairs:
+        st.caption("표시할 트레이드 쌍이 없습니다.")
+    else:
+        pair_labels = [
+            f"{b.get('symbol')} | {b.get('execTime')} → {s.get('execTime')}"
+            for b, s in trade_pairs
+        ]
+        selected = st.selectbox("트레이드 선택", pair_labels)
+        idx = pair_labels.index(selected)
+        buy_trade, sell_trade = trade_pairs[idx]
+
+        symbol       = buy_trade.get("symbol", "BTCUSDT")
+        entry_ms     = int(buy_trade.get("execTime", 0))
+        exit_ms      = int(sell_trade.get("execTime", 0))
+
+        if entry_ms > 0:
+            with st.spinner("캔들 데이터 수집 중..."):
+                candles = get_candles(symbol, entry_ms, interval="15", limit=50)
+            render_candle_chart(candles, entry_ms, exit_ms, symbol)
+        else:
+            st.warning("execTime 정보가 없어 차트를 표시할 수 없습니다.")
+
+        st.divider()
+        col1, col2 = st.columns(2)
+        with col1:
+            setup_tag = st.selectbox(
+                "셋업 태그",
+                ["FVG", "OB", "유동성스윕", "브레이커", "기타"],
+                key=f"setup_{idx}",
+            )
+        with col2:
+            note = st.text_input("메모", key=f"note_{idx}", placeholder="진입 근거 등")
+
+        if st.button("💾 저장", key=f"save_{idx}"):
+            st.success(f"저장 완료: {symbol} | {setup_tag} | {note}")
