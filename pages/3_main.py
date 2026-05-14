@@ -84,20 +84,22 @@ tab1, tab2, tab3 = st.tabs(["📊 KPI 대시보드", "📋 거래내역 리스�
 # ═══════════════════════════ Tab 1: KPI 대시보드 ════════════════════════════
 
 with tab1:
-    stats = st.session_state.get("last_stats", {})
+    stats     = st.session_state.get("last_stats", {})
+    total_pnl = sum(float(t.get("closedPnl", 0) or 0) for t in raw_trades)
 
     st.subheader("📌 핵심 지표")
     with st.expander("ℹ️ 지표 설명 보기"):
         st.markdown(
             "- **승률**: 전체 거래 중 익절로 마감된 비율\n"
             "- **평균 수익률**: 익절/손절을 포함한 거래당 평균 손익률 (%)\n"
-            "- **기대값**: `승률 × 평균수익 − 패율 × 평균손실` — 0 이상이면 장기적으로 수익\n"
+            "- **수익금**: 전체 실현 손익 합계 (USDT 기준)\n"
             "- **손절 일관성**: 손절 금액이 얼마나 일정한지 (1에 가까울수록 손절 기준이 규칙적)"
         )
+    pnl_display = f"+${total_pnl:.2f}" if total_pnl >= 0 else f"-${abs(total_pnl):.2f}"
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("승률",        f"{stats.get('win_rate', 0):.1%}")
     c2.metric("평균 수익률", f"{stats.get('avg_return_rate', 0):.2f}%")
-    c3.metric("기대값",       f"{stats.get('expected_value', 0):.2f}%")
+    c3.metric("수익금",       pnl_display)
     c4.metric("손절 일관성", f"{stats.get('loss_consistency', 0):.2f}")
 
     weaknesses = st.session_state.get("last_weaknesses", [])
@@ -196,7 +198,7 @@ with tab2:
                 "진입가":        entry_price,
                 "청산가":        exit_price,
                 "수량":          qty,
-                "실현손익":      pnl,
+                "실현손익($)":   f"+${pnl:.2f}" if pnl >= 0 else f"-${abs(pnl):.2f}",
                 "수익률(%)":     round(ret_pct, 2),
                 "진입시각(KST)": _ms_to_kst(buy.get("execTime", 0)),
                 "청산시각(KST)": _ms_to_kst(sell.get("execTime", 0)),
