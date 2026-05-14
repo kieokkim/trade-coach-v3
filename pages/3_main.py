@@ -431,6 +431,7 @@ with tab2:
                 "exit_price":  float(sell_t.get("execPrice", 0)),
                 "closed_pnl":  pnl,
                 "result":      "win" if pnl > 0 else "loss",
+                "entry_ms":    entry_ms,
             }
             ict_patterns = {"fvg_zones": fvgs, "ob_zones": obs}
 
