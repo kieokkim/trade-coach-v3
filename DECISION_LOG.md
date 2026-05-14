@@ -146,3 +146,15 @@
 - session_state는 브라우저 탭 단위로 유효 → 앱 재시작 시 자동 초기화
 
 **범위:** Tab 2 복기 뷰어(`replay_` prefix), Tab 3 차트 태깅(`tag_candles_` prefix)
+
+---
+
+### Decision 10: 거짓돌파 탐지 v2.2로 연기
+**결정:** 현재 브랜치(feature/replay-foundation)에서 거짓돌파(Fakeout) + 함정(Bull/Bear Trap) 탐지 미구현
+
+**이유:**
+- 거짓돌파는 직전 고점/저점 돌파 후 되돌림을 실시간으로 판단해야 함
+- 봉 확정 여부 + 거래량 데이터 필요 (현재 Kline에 volume 있지만 로직 복잡)
+- 오탐율이 높아 신뢰도 낮은 탐지는 오히려 코칭 품질 저하
+
+**v2.2에서:** `ict/fakeout_detector.py` 구현 예정

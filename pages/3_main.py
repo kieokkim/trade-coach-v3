@@ -41,6 +41,8 @@ from nodes.quiz_nodes import evaluate_quiz
 from nodes.replay_coach_node import replay_coach_node
 from nodes.coaching_nodes import generate_setup_suggestion
 from ict.fvg_detector import detect_fvg
+from ict.ob_detector import detect_ob
+from ict.trend_detector import detect_trendline
 from market.candles import get_candles
 from utils.chart import render_candle_chart
 
@@ -89,7 +91,7 @@ _NODE_INFO = [
     {"name": "performance_analysis","desc": "주간/월간 성과 요약",       "llm": True},
     {"name": "backtest_coach",     "desc": "ICT 코칭 생성",             "llm": True},
     {"name": "candle_fetch",       "desc": "진입시점 캔들 복원",         "llm": False},
-    {"name": "ict_detect",         "desc": "FVG rule-based 탐지",       "llm": False},
+    {"name": "ict_detect",         "desc": "FVG/OB/추세선 탐지",         "llm": False},
     {"name": "replay_coach",       "desc": "복기 코멘트 생성",           "llm": True},
 ]
 
@@ -283,8 +285,10 @@ with tab2:
                     st.session_state[cache_key] = get_candles(symbol, entry_ms, interval="15", limit=50)
             candles = st.session_state[cache_key]
             fvgs    = detect_fvg(candles)
+            obs     = detect_ob(candles)
+            tl      = detect_trendline(candles)
 
-            # Plotly Figure (FVG 오버레이)
+            # Plotly Figure (FVG / OB / 추세선 오버레이)
             df_c = pd.DataFrame(candles)
             df_c["dt"] = pd.to_datetime(df_c["timestamp"], unit="ms", utc=True)
 
@@ -299,6 +303,7 @@ with tab2:
                 decreasing_line_color="#ef5350",
             )])
 
+            # FVG 오버레이
             for fvg in fvgs:
                 fvg_dt = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True)
                 color  = "rgba(255,200,0,0.2)" if fvg["type"] == "bullish" else "rgba(255,80,80,0.15)"
@@ -310,6 +315,65 @@ with tab2:
                     line_width=0,
                     layer="below",
                 )
+
+            # OB 오버레이
+            for ob in obs:
+                ob_dt  = pd.to_datetime(ob["timestamp"], unit="ms", utc=True)
+                ob_clr = "rgba(0,200,100,0.15)" if ob["type"] == "bullish" else "rgba(200,50,50,0.15)"
+                fig.add_shape(
+                    type="rect",
+                    x0=ob_dt, x1=df_c["dt"].max(),
+                    y0=ob["bottom"], y1=ob["top"],
+                    fillcolor=ob_clr,
+                    line_width=0,
+                    layer="below",
+                )
+
+            # 추세선 오버레이
+            if tl:
+                dt0 = df_c["dt"].iloc[0]
+                dt1 = df_c["dt"].iloc[-1]
+                ts_to_idx = {c["timestamp"]: i for i, c in enumerate(candles)}
+
+                def _tl_y(line_dict):
+                    slope  = line_dict["slope"]
+                    pts    = line_dict["points"]
+                    i0     = ts_to_idx.get(pts[0]["timestamp"], 0)
+                    y0_ref = pts[0]["price"]
+                    n      = len(candles)
+                    return y0_ref + slope * (0 - i0), y0_ref + slope * (n - 1 - i0)
+
+                res = tl.get("resistance")
+                sup = tl.get("support")
+
+                if res:
+                    ry0, ry1 = _tl_y(res)
+                    fig.add_trace(go.Scatter(
+                        x=[dt0, dt1], y=[ry0, ry1],
+                        mode="lines",
+                        line=dict(color="red", dash="dash", width=1),
+                        opacity=0.6, name="저항선",
+                    ))
+                if sup:
+                    sy0, sy1 = _tl_y(sup)
+                    fig.add_trace(go.Scatter(
+                        x=[dt0, dt1], y=[sy0, sy1],
+                        mode="lines",
+                        line=dict(color="green", dash="dash", width=1),
+                        opacity=0.6, name="지지선",
+                    ))
+                if tl.get("is_channel") and res and sup:
+                    ry0, ry1 = _tl_y(res)
+                    sy0, sy1 = _tl_y(sup)
+                    fig.add_trace(go.Scatter(
+                        x=[dt0, dt1, dt1, dt0, dt0],
+                        y=[ry0, ry1, sy1, sy0, ry0],
+                        fill="toself",
+                        fillcolor="rgba(150,150,150,0.08)",
+                        line=dict(width=0),
+                        showlegend=False,
+                        hoverinfo="skip",
+                    ))
 
             entry_dt  = datetime.fromtimestamp(entry_ms / 1000, tz=timezone.utc)
             exit_dt   = datetime.fromtimestamp(exit_ms  / 1000, tz=timezone.utc)
@@ -329,7 +393,7 @@ with tab2:
                 ))
 
             fig.update_layout(
-                title=f"{symbol} 복기 차트 (FVG 오버레이)",
+                title=f"{symbol} 복기 차트 (FVG/OB/추세선 오버레이)",
                 xaxis_rangeslider_visible=False,
                 height=520,
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -337,19 +401,45 @@ with tab2:
             st.plotly_chart(fig, use_container_width=True)
 
             # 자동 셋업 태깅
-            auto_setup = "FVG" if fvgs else "확인필요"
+            detected_setups = []
+            if fvgs: detected_setups.append("FVG")
+            if obs:  detected_setups.append("OB")
+            auto_setup = "+".join(detected_setups) if detected_setups else "확인필요"
             st.session_state[f"setup_tag_{sel_trade_id}"] = auto_setup
             st.badge(f"자동 감지 셋업: {auto_setup}")
 
-            # FVG 결과 텍스트
-            if fvgs:
-                st.markdown(f"**FVG 감지: {len(fvgs)}개**")
-                for fvg in fvgs:
-                    fvg_time = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True).strftime("%Y-%m-%d %H:%M")
-                    tag      = "📈 Bullish" if fvg["type"] == "bullish" else "📉 Bearish"
-                    st.caption(f"{tag} FVG  |  {fvg_time} UTC  |  {fvg['bottom']:.2f} ~ {fvg['top']:.2f}")
-            else:
-                st.info("이 구간에서 FVG가 탐지되지 않았습니다.")
+            # 패턴 탐지 결과 표시
+            col_fvg, col_ob, col_tl = st.columns(3)
+            with col_fvg:
+                if fvgs:
+                    st.markdown(f"**FVG: {len(fvgs)}개**")
+                    for fvg in fvgs:
+                        fvg_time = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True).strftime("%m-%d %H:%M")
+                        tag = "📈 Bull" if fvg["type"] == "bullish" else "📉 Bear"
+                        st.caption(f"{tag} | {fvg_time} | {fvg['bottom']:.1f}~{fvg['top']:.1f}")
+                else:
+                    st.info("FVG 없음")
+
+            with col_ob:
+                if obs:
+                    st.markdown(f"**OB: {len(obs)}개**")
+                    for ob in obs:
+                        ob_time = pd.to_datetime(ob["timestamp"], unit="ms", utc=True).strftime("%m-%d %H:%M")
+                        tag = "🟢 Bull" if ob["type"] == "bullish" else "🔴 Bear"
+                        st.caption(f"{tag} | {ob_time} | {ob['bottom']:.1f}~{ob['top']:.1f}")
+                else:
+                    st.info("OB 없음")
+
+            with col_tl:
+                if tl and (tl.get("resistance") or tl.get("support")):
+                    channel_label = f" ({tl['channel_type']} 채널)" if tl.get("is_channel") else ""
+                    st.markdown(f"**추세선{channel_label}**")
+                    if tl.get("resistance"):
+                        st.caption(f"저항선 기울기: {tl['resistance']['slope']:.2f}")
+                    if tl.get("support"):
+                        st.caption(f"지지선 기울기: {tl['support']['slope']:.2f}")
+                else:
+                    st.info("추세선 없음")
 
             # LLM 복기 코멘트
             pnl = float(sell_t.get("closedPnl", 0) or 0)
@@ -361,7 +451,7 @@ with tab2:
                 "closed_pnl":  pnl,
                 "result":      "win" if pnl > 0 else "loss",
             }
-            ict_patterns = {"fvg_zones": fvgs}
+            ict_patterns = {"fvg_zones": fvgs, "ob_zones": obs}
 
             with st.spinner("복기 코멘트 생성 중..."):
                 comment = replay_coach_node(candles, ict_patterns, selected_trade)
@@ -452,7 +542,10 @@ with tab3:
             if cache_key_t3 not in st.session_state:
                 with st.spinner("캔들 데이터 수집 중..."):
                     st.session_state[cache_key_t3] = get_candles(symbol, entry_ms, interval="15", limit=50)
-            render_candle_chart(st.session_state[cache_key_t3], entry_ms, exit_ms, symbol)
+            candles_t3 = st.session_state[cache_key_t3]
+            obs_t3 = detect_ob(candles_t3)
+            tl_t3  = detect_trendline(candles_t3)
+            render_candle_chart(candles_t3, entry_ms, exit_ms, symbol, obs=obs_t3, trendline=tl_t3)
         else:
             st.warning("execTime 정보가 없어 차트를 표시할 수 없습니다.")
 
