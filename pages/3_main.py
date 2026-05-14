@@ -1,7 +1,11 @@
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from nodes.quiz_nodes import evaluate_quiz
+from ict.fvg_detector import detect_fvg
+from market.candles import get_candles
+from utils.chart import render_candle_chart
 
 st.set_page_config(page_title="TradeCoach | 대시보드", page_icon="📊", layout="wide")
 
@@ -99,20 +103,41 @@ with tab1:
                     st.session_state.pop("last_quiz_feedback", None)
                     st.rerun()
 
-# ════════════════════════ Tab 2: 거래내역 리스트 ════════════════════════════
+# ════════════════════════ Tab 2: 거래내역 리스트 + 복기 뷰어 ════════════════
 
 with tab2:
     st.subheader("📋 거래내역")
 
     raw_trades = res.get("raw_trades", [])
+
+    # journal_entries가 비어있을 경우 raw_trades에서 청산 거래 필터링
+    journal_entries = st.session_state.get("last_journal_entries", [])
+
+    # 복기에 사용할 트레이드 쌍 구성 (buy + sell 매칭)
+    buy_trades  = [t for t in raw_trades if str(t.get("side", "")).lower() == "buy"]
+    sell_trades = [t for t in raw_trades if str(t.get("side", "")).lower() == "sell"
+                   and str(t.get("closedPnl", "0")) != "0"]
+
+    trade_pairs: list[tuple[dict, dict]] = []
+    used_sells: set[int] = set()
+    for buy in buy_trades:
+        for j, sell in enumerate(sell_trades):
+            if j in used_sells:
+                continue
+            if buy.get("symbol") == sell.get("symbol"):
+                trade_pairs.append((buy, sell))
+                used_sells.add(j)
+                break
+
+    # ── 거래 테이블 표시 ──────────────────────────────────────────────────────
     if raw_trades:
         df_trades = pd.DataFrame(raw_trades)
-        display_cols = [c for c in ["execTime", "symbol", "side", "execPrice", "orderQty", "closedPnl", "stopOrderType"] if c in df_trades.columns]
+        display_cols = [c for c in ["execTime", "symbol", "side", "execPrice", "orderQty", "closedPnl"] if c in df_trades.columns]
         st.dataframe(df_trades[display_cols] if display_cols else df_trades, use_container_width=True)
     else:
         st.caption("거래내역 없음")
 
-    journal_entries = st.session_state.get("last_journal_entries", [])
+    # ── 매매일지 (journal_entries 기반) ──────────────────────────────────────
     if journal_entries:
         st.divider()
         st.subheader("📒 매매일지")
@@ -127,13 +152,99 @@ with tab2:
                 st.write(f"**청산 근거**: {entry.get('exit_reason', '') or '추론 불가'}")
                 st.write(f"**회고**: {entry.get('reflection', '') or '-'}")
 
+    # ── 복기 뷰어 ────────────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("🔍 복기 뷰어")
+
+    if not trade_pairs:
+        st.caption("복기할 트레이드 쌍이 없습니다. (raw_trades에 Buy/Sell 쌍 필요)")
+    else:
+        pair_labels = [
+            f"{b.get('symbol')} | 진입 {b.get('execPrice')} → 청산 {s.get('execPrice')}  PnL={s.get('closedPnl', '?')}"
+            for b, s in trade_pairs
+        ]
+        selected_label = st.selectbox("트레이드 선택", pair_labels, key="replay_select")
+        sel_idx = pair_labels.index(selected_label)
+
+        if st.button("▶ 복기 시작", type="primary", key="replay_btn"):
+            buy_t, sell_t = trade_pairs[sel_idx]
+            symbol   = buy_t.get("symbol", "BTCUSDT")
+            entry_ms = int(buy_t.get("execTime",  0))
+            exit_ms  = int(sell_t.get("execTime", 0))
+
+            with st.spinner("캔들 & FVG 분석 중..."):
+                candles = get_candles(symbol, entry_ms, interval="15", limit=50)
+                fvgs    = detect_fvg(candles)
+
+            # ── Plotly Figure 직접 구성 (FVG 오버레이 추가) ──────────────────
+            df_c = pd.DataFrame(candles)
+            df_c["dt"] = pd.to_datetime(df_c["timestamp"], unit="ms", utc=True)
+
+            fig = go.Figure(data=[go.Candlestick(
+                x=df_c["dt"],
+                open=df_c["open"],
+                high=df_c["high"],
+                low=df_c["low"],
+                close=df_c["close"],
+                name=symbol,
+                increasing_line_color="#26a69a",
+                decreasing_line_color="#ef5350",
+            )])
+
+            # FVG 오버레이
+            for fvg in fvgs:
+                fvg_dt = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True)
+                color  = "rgba(255,200,0,0.2)" if fvg["type"] == "bullish" else "rgba(255,80,80,0.15)"
+                fig.add_shape(
+                    type="rect",
+                    x0=fvg_dt, x1=df_c["dt"].max(),
+                    y0=fvg["bottom"], y1=fvg["top"],
+                    fillcolor=color,
+                    line_width=0,
+                    layer="below",
+                )
+
+            # 진입/청산 마커
+            from datetime import datetime, timezone
+            entry_dt = datetime.fromtimestamp(entry_ms / 1000, tz=timezone.utc)
+            exit_dt  = datetime.fromtimestamp(exit_ms  / 1000, tz=timezone.utc)
+            entry_row = df_c[df_c["timestamp"] <= entry_ms].tail(1)
+            exit_row  = df_c[df_c["timestamp"] <= exit_ms].tail(1)
+            if not entry_row.empty:
+                fig.add_trace(go.Scatter(
+                    x=[entry_dt], y=[float(entry_row["low"].iloc[0]) * 0.999],
+                    mode="markers", marker=dict(symbol="triangle-up", size=14, color="#1565C0"),
+                    name="진입",
+                ))
+            if not exit_row.empty:
+                fig.add_trace(go.Scatter(
+                    x=[exit_dt], y=[float(exit_row["high"].iloc[0]) * 1.001],
+                    mode="markers", marker=dict(symbol="triangle-down", size=14, color="#C62828"),
+                    name="청산",
+                ))
+
+            fig.update_layout(
+                title=f"{symbol} 복기 차트 (FVG 오버레이)",
+                xaxis_rangeslider_visible=False,
+                height=520,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            # ── FVG 결과 텍스트 ───────────────────────────────────────────────
+            if fvgs:
+                st.markdown(f"**FVG 감지: {len(fvgs)}개**")
+                for fvg in fvgs:
+                    fvg_time = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True).strftime("%Y-%m-%d %H:%M")
+                    label    = "📈 Bullish" if fvg["type"] == "bullish" else "📉 Bearish"
+                    st.caption(f"{label} FVG  |  {fvg_time} UTC  |  {fvg['bottom']:.2f} ~ {fvg['top']:.2f}")
+            else:
+                st.info("이 구간에서 FVG가 탐지되지 않았습니다.")
+
 # ═══════════════════════════ Tab 3: 셋업 태깅 ══════════════════════════════
 
 with tab3:
     st.subheader("📚 셋업 태깅")
-
-    from market.candles import get_candles
-    from utils.chart import render_candle_chart
 
     trades = res.get("raw_trades", [])
     buy_trades  = [t for t in trades if str(t.get("side", "")).lower() == "buy"]
