@@ -158,3 +158,27 @@
 - 오탐율이 높아 신뢰도 낮은 탐지는 오히려 코칭 품질 저하
 
 **v2.2에서:** `ict/fakeout_detector.py` 구현 예정
+
+---
+
+### Decision 11: OB/추세선/채널 탐지 현재 브랜치 구현
+**결정:** `ict/ob_detector.py`, `ict/trend_detector.py`를 `feature/replay-foundation`에서 구현
+
+**이유:**
+- OB는 3캔들 패턴으로 rule-based 구현 범위 내
+- 추세선/채널은 고점/저점 연결로 단순 구현 가능
+- 두 패턴 모두 FVG와 함께 복기 뷰어에서 즉시 활용 가능
+
+**트레이드오프:**
+- 오탐 가능성 있음 (캔들 수가 적으면 추세선 신뢰도 낮음)
+- limit=50 캔들 기준, 데이터 부족 시 None 반환으로 처리
+
+---
+
+### Decision 12: 거짓돌파+함정 탐지 v2.2로 연기
+**결정:** Fakeout/Bull Trap/Bear Trap 탐지를 현재 브랜치에서 미구현
+
+**이유:**
+- 봉 확정 여부 + 직전 고점/저점 비교 + 거래량 검증 필요
+- 오탐율이 높아 신뢰도 낮은 탐지는 코칭 품질 저하 우려
+- v2.2 `feature/ict-detector-engine`에서 구현 예정
