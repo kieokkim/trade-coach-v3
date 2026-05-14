@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from nodes.quiz_nodes import evaluate_quiz
+from nodes.replay_coach_node import replay_coach_node
 from ict.fvg_detector import detect_fvg
 from market.candles import get_candles
 from utils.chart import render_candle_chart
@@ -172,11 +173,15 @@ with tab2:
             entry_ms = int(buy_t.get("execTime",  0))
             exit_ms  = int(sell_t.get("execTime", 0))
 
-            with st.spinner("캔들 & FVG 분석 중..."):
-                candles = get_candles(symbol, entry_ms, interval="15", limit=50)
-                fvgs    = detect_fvg(candles)
+            # ── 캔들 캐싱 (동일 거래 재선택 시 API 재호출 방지) ──────────────
+            cache_key = f"replay_{buy_t.get('orderId', str(entry_ms))}"
+            if cache_key not in st.session_state:
+                with st.spinner("캔들 데이터 수집 중..."):
+                    st.session_state[cache_key] = get_candles(symbol, entry_ms, interval="15", limit=50)
+            candles = st.session_state[cache_key]
+            fvgs    = detect_fvg(candles)
 
-            # ── Plotly Figure 직접 구성 (FVG 오버레이 추가) ──────────────────
+            # ── Plotly Figure 구성 (FVG 오버레이) ────────────────────────────
             df_c = pd.DataFrame(candles)
             df_c["dt"] = pd.to_datetime(df_c["timestamp"], unit="ms", utc=True)
 
@@ -191,7 +196,6 @@ with tab2:
                 decreasing_line_color="#ef5350",
             )])
 
-            # FVG 오버레이
             for fvg in fvgs:
                 fvg_dt = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True)
                 color  = "rgba(255,200,0,0.2)" if fvg["type"] == "bullish" else "rgba(255,80,80,0.15)"
@@ -204,10 +208,9 @@ with tab2:
                     layer="below",
                 )
 
-            # 진입/청산 마커
             from datetime import datetime, timezone
-            entry_dt = datetime.fromtimestamp(entry_ms / 1000, tz=timezone.utc)
-            exit_dt  = datetime.fromtimestamp(exit_ms  / 1000, tz=timezone.utc)
+            entry_dt  = datetime.fromtimestamp(entry_ms / 1000, tz=timezone.utc)
+            exit_dt   = datetime.fromtimestamp(exit_ms  / 1000, tz=timezone.utc)
             entry_row = df_c[df_c["timestamp"] <= entry_ms].tail(1)
             exit_row  = df_c[df_c["timestamp"] <= exit_ms].tail(1)
             if not entry_row.empty:
@@ -236,10 +239,26 @@ with tab2:
                 st.markdown(f"**FVG 감지: {len(fvgs)}개**")
                 for fvg in fvgs:
                     fvg_time = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True).strftime("%Y-%m-%d %H:%M")
-                    label    = "📈 Bullish" if fvg["type"] == "bullish" else "📉 Bearish"
-                    st.caption(f"{label} FVG  |  {fvg_time} UTC  |  {fvg['bottom']:.2f} ~ {fvg['top']:.2f}")
+                    tag      = "📈 Bullish" if fvg["type"] == "bullish" else "📉 Bearish"
+                    st.caption(f"{tag} FVG  |  {fvg_time} UTC  |  {fvg['bottom']:.2f} ~ {fvg['top']:.2f}")
             else:
                 st.info("이 구간에서 FVG가 탐지되지 않았습니다.")
+
+            # ── LLM 복기 코멘트 ───────────────────────────────────────────────
+            pnl = float(sell_t.get("closedPnl", 0) or 0)
+            selected_trade = {
+                "symbol":      symbol,
+                "side":        buy_t.get("side", ""),
+                "entry_price": float(buy_t.get("execPrice",  0)),
+                "exit_price":  float(sell_t.get("execPrice", 0)),
+                "closed_pnl":  pnl,
+                "result":      "win" if pnl > 0 else "loss",
+            }
+            ict_patterns = {"fvg_zones": fvgs}
+
+            with st.spinner("복기 코멘트 생성 중..."):
+                comment = replay_coach_node(candles, ict_patterns, selected_trade)
+            st.info(comment)
 
 # ═══════════════════════════ Tab 3: 셋업 태깅 ══════════════════════════════
 
