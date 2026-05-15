@@ -4,7 +4,7 @@ from pathlib import Path
 import streamlit as st
 
 from graph import DEFAULT_STATE, graph
-from utils.constants import NODE_LABELS, sidebar_pipeline_md
+from utils.constants import NODE_LABELS
 
 st.set_page_config(page_title="TradeCoach | 분석 중", page_icon="⏳", layout="centered")
 
@@ -36,15 +36,6 @@ STATUS_MESSAGES = {
 
 progress    = st.progress(0)
 status_text = st.empty()
-
-# 사이드바 노드 로그 (개발자용)
-st.sidebar.divider()
-sidebar_log = st.sidebar.empty()
-
-
-def render_sidebar(done: list[str], current: str | None) -> None:
-    sidebar_log.markdown(sidebar_pipeline_md(done, current))
-
 
 # ── 샘플 모드: TC_SAMPLE_FILE env var 설정 후 API 키 임시 제거 ───────────────
 _SAMPLE_FILE_MAP = {
@@ -89,9 +80,6 @@ for chunk in graph.stream(invoke_state, stream_mode="updates"):
         status_text.text(STATUS_MESSAGES.get(node_name, "분석 중..."))
         progress.progress(len(completed) / _total)
 
-        # 사이드바: 개발자용 노드 로그 (현재 노드 ▶️, 완료 ✅, 대기 ○)
-        render_sidebar(completed[:-1], node_name)
-
         # bybit_fetch 완료 직후 거래건수 메시지로 교체
         if node_name == "bybit_fetch":
             closed = len([t for t in raw_trades_captured if t.get("closedPnl", "0") != "0"])
@@ -101,7 +89,6 @@ for chunk in graph.stream(invoke_state, stream_mode="updates"):
                 status_text.text(f"기존 데이터를 제외한 신규 {closed}건을 분석하는 중...")
 
 # 완료
-render_sidebar(completed, None)
 status_text.text("✅ 분석 완료!")
 progress.progress(1.0)
 
