@@ -35,23 +35,28 @@ st.divider()
 st.subheader("🎮 데모 모드")
 st.caption("Bybit 계정 없이 샘플 데이터로 체험해보세요")
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    if st.button("📊 샘플 #1 불러오기", use_container_width=True):
-        st.session_state["sample_mode"]  = "sample_1"
-        st.session_state["sample_label"] = "샘플 #1"
-        st.session_state["api_ready"]    = False
+    st.markdown("**👶 초보 트레이더**")
+    st.caption("감에 의존 · 승률 25%")
+    if st.button("체험하기", key="btn_beginner", use_container_width=True):
+        st.session_state["sample_mode"]  = "beginner"
+        st.session_state["sample_label"] = "초보 트레이더 데모"
         st.switch_page("pages/2_loading.py")
 
 with col2:
-    if st.button("📈 샘플 #2 불러오기 (신규 거래 추가)", use_container_width=True):
-        st.session_state["sample_mode"]  = "sample_2"
-        st.session_state["sample_label"] = "샘플 #2"
-        st.session_state["api_ready"]    = False
+    st.markdown("**🧑 중급 트레이더**")
+    st.caption("ICT 기초 · 승률 42%")
+    if st.button("체험하기", key="btn_intermediate", use_container_width=True):
+        st.session_state["sample_mode"]  = "intermediate"
+        st.session_state["sample_label"] = "중급 트레이더 데모"
         st.switch_page("pages/2_loading.py")
 
-st.info(
-    "**샘플 #1**: 초급 트레이더의 8일 거래내역 (승률 37.5%, 손절 불규칙)  \n"
-    "**샘플 #2**: 샘플 #1 + 근거 없는 진입 거래 내역 추가 (패턴 반복 확인)"
-)
+with col3:
+    st.markdown("**🏆 고수 트레이더**")
+    st.caption("ICT 심층 · 승률 67%")
+    if st.button("체험하기", key="btn_expert", use_container_width=True):
+        st.session_state["sample_mode"]  = "expert"
+        st.session_state["sample_label"] = "고수 트레이더 데모"
+        st.switch_page("pages/2_loading.py")

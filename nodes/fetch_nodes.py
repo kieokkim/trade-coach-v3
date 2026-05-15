@@ -11,8 +11,20 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-_SAMPLE_PATH = Path(__file__).parent.parent / "data" / "sample_trades.json"
+SAMPLE_FILE_MAP = {
+    "sample_1":     "data/sample_trades_1.json",
+    "sample_2":     "data/sample_trades_2.json",
+    "beginner":     "data/sample_trades_beginner.json",
+    "intermediate": "data/sample_trades_intermediate.json",
+    "expert":       "data/sample_trades_expert.json",
+}
+
+_ROOT = Path(__file__).parent.parent
 _BYBIT_EXEC_URL = "https://api.bybit.com/v5/execution/list"
+
+
+def _sample_path(sample_mode: str) -> Path:
+    return _ROOT / SAMPLE_FILE_MAP.get(sample_mode, "data/sample_trades_1.json")
 
 
 def new_data_check_node(state: dict) -> dict:
@@ -33,8 +45,10 @@ def new_data_check_node(state: dict) -> dict:
         logger.info("new_data_check_node: first run, has_new_data=True | session_id=%s", session_id)
         return {"has_new_data": True}
 
+    sample_mode = state.get("sample_mode", "sample_1")
+    path = _sample_path(sample_mode)
     try:
-        data = json.loads(_SAMPLE_PATH.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
         trades = data.get("result", {}).get("list", [])
         if not trades:
             return {"has_new_data": False}
@@ -59,21 +73,23 @@ def bybit_fetch_node(state: dict) -> dict:
     api_key = os.getenv("BYBIT_API_KEY", "")
     api_secret = os.getenv("BYBIT_API_SECRET", "")
 
+    sample_mode = state.get("sample_mode", "sample_1")
+    path = _sample_path(sample_mode)
+
     trades = []
     if api_key and api_secret:
-        trades = _fetch_from_api(api_key, api_secret)
+        trades = _fetch_from_api(api_key, api_secret, path)
 
-    # API 결과 없으면 샘플 폴백
     if not trades:
-        logger.info("bybit_fetch_node: no trades from API, loading sample_trades.json")
-        trades = _load_sample()
+        logger.info("bybit_fetch_node: no trades from API, loading sample | mode=%s", sample_mode)
+        trades = _load_sample(path)
 
     now = datetime.now(tz=timezone.utc).isoformat()
     logger.info("bybit_fetch_node end | session_id=%s trades=%d", session_id, len(trades))
     return {"raw_trades": trades, "last_fetched_at": now}
 
 
-def _fetch_from_api(api_key: str, api_secret: str) -> list[dict]:
+def _fetch_from_api(api_key: str, api_secret: str, fallback_path: Path) -> list[dict]:
     timestamp = str(int(time.time() * 1000))
     recv_window = "5000"
     query_str = "category=linear&limit=50"
@@ -104,12 +120,10 @@ def _fetch_from_api(api_key: str, api_secret: str) -> list[dict]:
         return data.get("result", {}).get("list", [])
     except Exception as e:
         logger.warning("bybit_fetch_node: API call failed: %s, falling back to sample", e)
-        return _load_sample()
+        return _load_sample(fallback_path)
 
 
-def _load_sample() -> list[dict]:
-    override = os.environ.get("TC_SAMPLE_FILE", "")
-    path = Path(override) if override else _SAMPLE_PATH
+def _load_sample(path: Path) -> list[dict]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         logger.info("bybit_fetch_node: loaded sample from %s", path.name)

@@ -53,6 +53,7 @@ class TradeCoachState(TypedDict, total=False):
     judge_result:    str          # 철학 검수 피드백
     judge_passed:    bool         # 철학 기준 통과 여부
     judge_scores:    dict         # 항목별 pass/fail
+    sample_mode:     str          # 'sample_1'|'sample_2'|'beginner'|'intermediate'|'expert'
 
 
 DEFAULT_STATE: TradeCoachState = {

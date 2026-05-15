@@ -25,8 +25,11 @@ status_text = st.empty()
 
 # ── 샘플 모드: TC_SAMPLE_FILE env var 설정 후 API 키 임시 제거 ───────────────
 _SAMPLE_FILE_MAP = {
-    "sample_1": str(Path(__file__).parent.parent / "data" / "sample_trades_1.json"),
-    "sample_2": str(Path(__file__).parent.parent / "data" / "sample_trades_2.json"),
+    "sample_1":     str(Path(__file__).parent.parent / "data" / "sample_trades_1.json"),
+    "sample_2":     str(Path(__file__).parent.parent / "data" / "sample_trades_2.json"),
+    "beginner":     str(Path(__file__).parent.parent / "data" / "sample_trades_beginner.json"),
+    "intermediate": str(Path(__file__).parent.parent / "data" / "sample_trades_intermediate.json"),
+    "expert":       str(Path(__file__).parent.parent / "data" / "sample_trades_expert.json"),
 }
 
 sample_mode    = st.session_state.get("sample_mode", "")
@@ -46,6 +49,7 @@ invoke_state = {
     "input_type":   "bybit",
     "journal_data": "",
     "raw_trades":   [],
+    "sample_mode":  sample_mode,
 }
 
 # ── graph.stream() ───────────────────────────────────────────────────────────
