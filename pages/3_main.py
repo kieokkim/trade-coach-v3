@@ -135,7 +135,7 @@ with tab1:
             showarrow=False,
         )]
     )
-    st.plotly_chart(fig_donut, use_container_width=True)
+    st.plotly_chart(fig_donut, use_container_width=True, key="donut_winrate")
 
     weaknesses = st.session_state.get("last_weaknesses", [])
     if weaknesses:
@@ -171,7 +171,7 @@ with tab1:
             margin=dict(t=0, b=0, l=0, r=0),
             xaxis_title="평균 수익률 (%)",
         )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, use_container_width=True, key="bar_setup_tab1")
 
     coaching = st.session_state.get("last_coaching", "")
     if coaching:
@@ -425,7 +425,7 @@ with tab2:
                 height=520,
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key=f"candle_{order_id}")
 
             # 자동 셋업 태깅
             detected_setups = []
@@ -591,7 +591,7 @@ with tab3:
             margin=dict(t=0, b=0, l=0, r=0),
             xaxis_title="평균 수익률 (%)",
         )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, use_container_width=True, key="bar_setup_tab3")
 
         if best_setup:
             st.success(f"가장 많이 수익난 셋업: **{best_setup}** ({setup_analysis[best_setup]:.2f}%)")
