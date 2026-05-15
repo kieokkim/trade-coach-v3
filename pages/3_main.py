@@ -219,15 +219,16 @@ if trade_pairs:
         rows.append({
             "거래번호":      tid,
             "종목":          buy.get("symbol", ""),
-            "방향":          "🟢 Long" if direction == "Long" else "🔴 Short",
+            "방향":          "↗️ Long" if direction == "Long" else "↘️ Short",
             "진입가":        entry_price,
             "청산가":        exit_price,
             "수량":          qty,
+            "결과":          "✅ WIN" if pnl >= 0 else "❌ LOSS",
             "실현손익($)":   f"+${pnl:.2f}" if pnl >= 0 else f"-${abs(pnl):.2f}",
             "수익률(%)":     round(ret_pct, 2),
             "진입시각(KST)": _ms_to_kst(buy.get("execTime", 0)),
             "청산시각(KST)": _ms_to_kst(sell.get("execTime", 0)),
-            "결과":          "✅ WIN" if pnl >= 0 else "❌ LOSS",
+            
         })
     st.dataframe(pd.DataFrame(rows), use_container_width=True)
 elif raw_trades:

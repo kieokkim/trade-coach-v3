@@ -5,7 +5,6 @@ from langgraph.graph import StateGraph, START, END
 
 from db import get_db, init_db
 from nodes.analysis_nodes import journal_analysis_node, weakness_detect_node
-from nodes.chart_nodes import chart_analysis_node, feedback_node
 from nodes.coaching_nodes import backtest_coach_node, fallback_classify_node
 from nodes.coaching_judge_node import coaching_judge_node
 from nodes.fetch_nodes import new_data_check_node, bybit_fetch_node
@@ -137,22 +136,7 @@ def memory_load_node(state: TradeCoachState) -> dict:
     }
 
 
-def input_router_node(state: TradeCoachState) -> dict:
-    has_journal = bool(state.get("journal_data", "").strip())
-    has_chart   = bool(state.get("chart_image",  "").strip())
-    if has_journal and has_chart:
-        input_type = "both"
-    elif has_chart:
-        input_type = "chart"
-    else:
-        input_type = "journal"
-    return {"input_type": input_type}
-
 # ──────────────────────────────── Routing ──────────────────────────────────
-
-def route_after_input(state: TradeCoachState) -> str:
-    return state["input_type"]
-
 
 def route_new_data(state: TradeCoachState) -> str:
     return "has_new" if state.get("has_new_data", False) else "no_new"
@@ -177,7 +161,6 @@ def _build_graph() -> StateGraph:
     builder.add_node("bybit_fetch",          bybit_fetch_node)
     builder.add_node("preprocess",           preprocess_node)
     builder.add_node("journal_write",        journal_write_node)
-    builder.add_node("input_router",         input_router_node)
     builder.add_node("journal_analysis",     journal_analysis_node)
     builder.add_node("performance_analysis", performance_analysis_node)
     builder.add_node("weakness_detect",      weakness_detect_node)
