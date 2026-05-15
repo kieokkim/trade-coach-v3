@@ -232,3 +232,42 @@
 **단기 수정:** 데이터 없을 때 "추론 불가" 대신 체결가/시간대/손익 팩트만 서술
 
 **장기 수정:** Decision 14와 연계하여 캔들 기반 추론으로 완전 대체 (v2.2)
+
+---
+
+### Decision 17: A+ 채점 기준 ICT 이론 기반으로 재설계
+**결정:** 기존 4가지 기준에서 ICT 이론 기반 5가지로 교체
+
+**제거된 기준:**
+- 손절 위치 (has_structure와 중복, Bybit API에 손절가 데이터 없음)
+- 감정 없음 (orderId random- 체크는 샘플 데이터에서만 작동)
+
+**새 기준:**
+| # | 기준 | 로직 |
+|---|------|------|
+| 1 | 구조 진입 | 진입가가 FVG/OB 구간 내 |
+| 2 | 반등 확인 | 직전 2캔들 저점이 구간 하단 ±0.5% 내 |
+| 3 | 추세 정렬 | direction과 channel_type 일치 |
+| 4 | 킬존 | UTC 02-05(런던) 또는 07-10(뉴욕) 세션 |
+| 5 | 손절 규율 | 당일 journal_entries 손절 3회 미만 |
+
+---
+
+### Decision 18: AI-as-Judge 패턴 도입
+**결정:** backtest_coach_node 출력을 별도 LLM이 트레이딩 철학 5가지로 검수
+
+**위치:** `backtest_coach → coaching_judge → quiz_generate`
+
+**이유:**
+- 코칭 품질 자동 검증 + Option C(AI-as-judge) 과제 요건 충족
+- temperature=0 고정으로 일관된 판정
+- judge 실패해도 파이프라인 중단 없음 (사용자에게 보완 제안만 표시)
+
+---
+
+### Decision 19: coaching_nodes.py direction 미추가
+**결정:** `backtest_coach_node`, `generate_setup_suggestion`은 direction 컨텍스트 추가 불필요
+
+**이유:**
+- 포트폴리오 레벨 데이터(weaknesses, setup_analysis)를 입력받으며 per-trade `trade` dict가 없어 direction 추가 위치 없음
+- `replay_coach_node`와 `entry_reason_node`는 `trade` dict를 직접 받으므로 해당 파일에만 적용
