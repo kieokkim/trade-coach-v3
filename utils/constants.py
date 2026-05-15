@@ -8,6 +8,7 @@ NODE_LABELS: dict[str, tuple[str, str, str]] = {
     "weakness_detect":      ("⚙️", "weakness_detect",      "약점 태그 추출"),
     "performance_analysis": ("🧠", "performance_analysis", "성과 요약 LLM"),
     "backtest_coach":       ("🧠", "backtest_coach",       "ICT 코칭 LLM"),
+    "coaching_judge":       ("🧠", "coaching_judge",       "코칭 검수 LLM"),
     "quiz_generate":        ("🧠", "quiz_generate",        "퀴즈 생성 LLM"),
     "memory_save":          ("⚙️", "memory_save",          "세션 저장"),
 }
