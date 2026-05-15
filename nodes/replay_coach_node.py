@@ -59,6 +59,7 @@ def replay_coach_node(
     """
     symbol      = trade.get("symbol", "")
     side        = trade.get("side", "")
+    direction   = trade.get("direction", "Long" if side == "Buy" else "Short")
     entry_price = trade.get("entry_price", 0)
     exit_price  = trade.get("exit_price", 0)
     closed_pnl  = trade.get("closed_pnl", 0)
@@ -80,6 +81,7 @@ def replay_coach_node(
     user_content = f"""\
 거래 정보:
 - 종목: {symbol}
+- 방향: {direction}
 - 진입가: {entry_price} / 청산가: {exit_price}
 - 결과: {result} (손익: {closed_pnl})
 

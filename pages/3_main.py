@@ -221,9 +221,12 @@ with tab2:
             exit_price  = float(sell.get("execPrice", 0) or 0)
             qty         = float(buy.get("orderQty", 0) or 0)
             ret_pct     = (exit_price - entry_price) / entry_price * 100 if entry_price else 0
+            direction       = buy.get("direction", "Long" if buy.get("side", "Buy") == "Buy" else "Short")
+            direction_label = "🟢 Long" if direction == "Long" else "🔴 Short"
             rows.append({
                 "거래번호":      tid,
                 "종목":          buy.get("symbol", ""),
+                "방향":          direction_label,
                 "진입가":        entry_price,
                 "청산가":        exit_price,
                 "수량":          qty,

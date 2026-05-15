@@ -8,6 +8,22 @@ logger = logging.getLogger(__name__)
 _REQUIRED_COLS = {"date", "result"}
 
 
+def _get_direction(trade: dict) -> str:
+    """
+    positionIdx: 0=단방향, 1=롱헤지, 2=숏헤지
+    단방향(0 또는 없음): Buy=Long, Sell=Short
+    헤지 모드: positionIdx로 판단
+    """
+    pos_idx = int(trade.get("positionIdx", 0))
+    side = trade.get("side", "Buy")
+    if pos_idx == 1:
+        return "Long"
+    elif pos_idx == 2:
+        return "Short"
+    else:
+        return "Long" if side == "Buy" else "Short"
+
+
 def preprocess_node(state: dict) -> dict:
     session_id = state.get("session_id", "default")
     logger.info("preprocess_node start | session_id=%s", session_id)
@@ -68,6 +84,10 @@ def _preprocess_journal(journal_data: str, session_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _preprocess_bybit(raw_trades: list[dict], session_id: str) -> dict:
+    # direction 파생: 모든 trade dict에 in-place 추가
+    for trade in raw_trades:
+        trade["direction"] = _get_direction(trade)
+
     rows = []
     for trade in raw_trades:
         closed_pnl_str = trade.get("closedPnl", "0")

@@ -64,11 +64,13 @@ def score_aplus(
     if bd["bounce_confirm"]:
         s += 1
 
-    # 3. 추세 정렬: 추세 방향과 진입 방향 일치
+    # 3. 추세 정렬: direction 기반, sideways/None은 중립으로 통과
+    direction = trade.get("direction", "Long" if side == "Buy" else "Short")
     ct = trend.get("channel_type")
     bd["trend_aligned"] = (
-        (side == "Buy"  and ct == "ascending") or
-        (side == "Sell" and ct == "descending")
+        (direction == "Long"  and ct == "ascending") or
+        (direction == "Short" and ct == "descending") or
+        ct == "sideways" or ct is None
     )
     if bd["trend_aligned"]:
         s += 1
