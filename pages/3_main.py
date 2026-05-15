@@ -275,10 +275,15 @@ with tab2:
             exit_ms  = int(sell_t.get("execTime", 0))
 
             # 캔들 캐싱
-            cache_key = f"replay_{buy_t.get('orderId', str(entry_ms))}"
+            order_id = buy_t.get("orderId", "")
+            cache_key = f"replay_{order_id or str(entry_ms)}"
             if cache_key not in st.session_state:
                 with st.spinner("캔들 데이터 수집 중..."):
-                    st.session_state[cache_key] = get_candles(symbol, entry_ms, interval="15", limit=50)
+                    st.session_state[cache_key] = get_candles(
+                        symbol, entry_ms, interval="15", limit=50,
+                        order_id=order_id,
+                        sample_mode=st.session_state.get("sample_mode") is not None,
+                    )
             candles = st.session_state[cache_key]
             fvgs    = detect_fvg(candles)
             obs     = detect_ob(candles)
@@ -546,10 +551,15 @@ with tab3:
         exit_ms  = int(sell_trade.get("execTime", 0))
 
         if entry_ms > 0:
-            cache_key_t3 = f"tag_candles_{buy_trade.get('orderId', str(entry_ms))}"
+            order_id_t3 = buy_trade.get("orderId", "")
+            cache_key_t3 = f"tag_candles_{order_id_t3 or str(entry_ms)}"
             if cache_key_t3 not in st.session_state:
                 with st.spinner("캔들 데이터 수집 중..."):
-                    st.session_state[cache_key_t3] = get_candles(symbol, entry_ms, interval="15", limit=50)
+                    st.session_state[cache_key_t3] = get_candles(
+                        symbol, entry_ms, interval="15", limit=50,
+                        order_id=order_id_t3,
+                        sample_mode=st.session_state.get("sample_mode") is not None,
+                    )
             candles_t3 = st.session_state[cache_key_t3]
             obs_t3 = detect_ob(candles_t3)
             tl_t3  = detect_trendline(candles_t3)
