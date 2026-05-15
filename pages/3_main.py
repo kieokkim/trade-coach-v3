@@ -178,6 +178,24 @@ with tab1:
         st.subheader("💬 코칭 피드백")
         st.write(coaching)
 
+        judge_result = res.get("judge_result", "")
+        judge_passed = res.get("judge_passed", True)
+        judge_scores = res.get("judge_scores", {})
+        if judge_result:
+            if judge_passed:
+                st.success(f"✅ 코칭 검수 통과: {judge_result}")
+            else:
+                st.warning(f"⚠️ 코칭 보완 필요: {judge_result}")
+                _SCORE_LABELS = {
+                    "daily_stop":         "일일 손절 중단",
+                    "fixed_loss":         "손실 고정",
+                    "no_revenge":         "복수매매 금지",
+                    "no_setup_no_trade":  "셋업 없음=진입 금지",
+                    "stop_first":         "손절선 사전 결정",
+                }
+                for col, (key, label) in zip(st.columns(5), _SCORE_LABELS.items()):
+                    col.metric(label, "✅" if judge_scores.get(key) else "❌")
+
     # 퀴즈
     quiz_q = st.session_state.get("last_quiz_question", "")
     if quiz_q:

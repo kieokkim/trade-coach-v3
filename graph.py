@@ -7,6 +7,7 @@ from db import get_db, init_db
 from nodes.analysis_nodes import journal_analysis_node, weakness_detect_node
 from nodes.chart_nodes import chart_analysis_node, feedback_node
 from nodes.coaching_nodes import backtest_coach_node, fallback_classify_node
+from nodes.coaching_judge_node import coaching_judge_node
 from nodes.fetch_nodes import new_data_check_node, bybit_fetch_node
 from nodes.journal_nodes import journal_write_node
 from nodes.memory_nodes import memory_save_node
@@ -49,6 +50,9 @@ class TradeCoachState(TypedDict, total=False):
     performance_summary: dict     # 성과 요약 KPI
     coaching_output: str          # ICT 코칭 결과 텍스트
     fallback_type:   str          # 'ict' | 'psychology' | 'pattern' | ''
+    judge_result:    str          # 철학 검수 피드백
+    judge_passed:    bool         # 철학 기준 통과 여부
+    judge_scores:    dict         # 항목별 pass/fail
 
 
 DEFAULT_STATE: TradeCoachState = {
@@ -81,6 +85,9 @@ DEFAULT_STATE: TradeCoachState = {
     "performance_summary": {},
     "coaching_output":   "",
     "fallback_type":     "",
+    "judge_result":      "",
+    "judge_passed":      False,
+    "judge_scores":      {},
 }
 
 # ──────────────────────────────── Nodes ────────────────────────────────────
@@ -175,6 +182,7 @@ def _build_graph() -> StateGraph:
     builder.add_node("weakness_detect",      weakness_detect_node)
     builder.add_node("fallback_classify",    fallback_classify_node)
     builder.add_node("backtest_coach",       backtest_coach_node)
+    builder.add_node("coaching_judge",       coaching_judge_node)
     builder.add_node("quiz_generate",        quiz_generate_node)
     builder.add_node("memory_save",          memory_save_node)
 
@@ -200,7 +208,8 @@ def _build_graph() -> StateGraph:
         route_after_fallback,
         {"backtest_coach": "backtest_coach"},
     )
-    builder.add_edge("backtest_coach", "quiz_generate")
+    builder.add_edge("backtest_coach",  "coaching_judge")
+    builder.add_edge("coaching_judge",  "quiz_generate")
     builder.add_edge("quiz_generate",  "memory_save")
     builder.add_edge("memory_save", END)
 
