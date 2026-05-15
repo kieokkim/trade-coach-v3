@@ -40,6 +40,7 @@ _COL_KO = {
 
 from nodes.replay_coach_node import replay_coach_node
 from nodes.coaching_nodes import generate_setup_suggestion
+from nodes.entry_reason_node import entry_reason_node
 from ict.fvg_detector import detect_fvg
 from ict.ob_detector import detect_ob
 from ict.trend_detector import detect_trendline
@@ -481,6 +482,43 @@ with tab2:
                 save_trade_tag(session_id, _oid, symbol, user_tag, user_confirmed=1)
                 st.session_state["trade_tags"][_oid] = {"tag": user_tag, "confirmed": 1}
                 st.success(f"태그 저장: {user_tag}")
+
+            # ── A+ 채점 + 진입 근거 분석 ──────────────────────────────────
+            st.divider()
+            cache_key_aplus = f"aplus_{order_id}"
+            if st.button("🏆 A+ 채점 + 진입 근거 분석", key=f"btn_{cache_key_aplus}"):
+                with st.spinner("분석 중..."):
+                    st.session_state[cache_key_aplus] = entry_reason_node(
+                        candles=candles,
+                        ict_patterns={"fvg_zones": fvgs, "ob_zones": obs, "trend_info": tl},
+                        trade={
+                            "symbol":    symbol,
+                            "side":      buy_t.get("side", ""),
+                            "execPrice": buy_t.get("execPrice", 0),
+                            "execTime":  buy_t.get("execTime",  0),
+                            "closedPnl": sell_t.get("closedPnl", 0),
+                        },
+                        session_id=session_id,
+                    )
+
+            if cache_key_aplus in st.session_state:
+                r = st.session_state[cache_key_aplus]
+                score = r["aplus_score"]
+                color = "#2E7D32" if score >= 4 else "#E65100" if score >= 2 else "#C62828"
+                st.markdown(
+                    f'<h3 style="color:{color}">A+ 점수: {score}/5</h3>',
+                    unsafe_allow_html=True,
+                )
+                bd = r["aplus_breakdown"]
+                labels = [
+                    ("구조 진입", "structure_entry"), ("반등 확인", "bounce_confirm"),
+                    ("추세 정렬", "trend_aligned"),   ("킬존",     "killzone"),
+                    ("손절 규율", "stop_discipline"),
+                ]
+                for col, (label, key) in zip(st.columns(5), labels):
+                    col.metric(label, "✅" if bd.get(key) else "❌")
+                st.info(f"**진입 근거:** {r['entry_reason']}")
+                st.warning(f"**코칭:** {r['coaching']}")
 
 # ═══════════════════════════ Tab 3: 셋업 태깅 ══════════════════════════════
 
