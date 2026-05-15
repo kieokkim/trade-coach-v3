@@ -1,18 +1,12 @@
 import io
 import logging
+from datetime import datetime, timezone
 
 import pandas as pd
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from utils.llm_factory import get_llm
 
-from config import (
-    WIN_RATE_THRESHOLD,
-    MAX_DRAWDOWN_THRESHOLD,
-    AVG_RETURN_RATE_THRESHOLD,
-    EXPECTED_VALUE_THRESHOLD,
-    LOSS_CONSISTENCY_THRESHOLD,
-)
 from db import get_db
 from tools.concept_tool import search_ict_concept, CONCEPT_NOT_FOUND_PREFIX
 
@@ -25,12 +19,60 @@ _ACTION_RULE_SYSTEM = """\
 금지 또는 의무 형식으로 작성하세요. 예: "OB 셋업에서 반드시 손절을 지정하세요" 또는 "FVG 셋업 외에는 진입하지 마세요".
 규칙 문장 하나만 출력하세요."""
 
-_WEAKNESS_RULES = [
-    ("win_rate",         lambda v: v < WIN_RATE_THRESHOLD,         "승률_낮음"),
-    ("avg_return_rate",  lambda v: v < AVG_RETURN_RATE_THRESHOLD,  "수익률_낮음"),
-    ("expected_value",   lambda v: v < EXPECTED_VALUE_THRESHOLD,   "기대값_음수"),
-    ("loss_consistency", lambda v: v > LOSS_CONSISTENCY_THRESHOLD, "손절_불규칙"),
-    ("max_drawdown",     lambda v: v >= MAX_DRAWDOWN_THRESHOLD,    "연속손실_패턴"),
+
+def _get_hour(exec_time_ms) -> int:
+    try:
+        return datetime.fromtimestamp(int(exec_time_ms) / 1000, tz=timezone.utc).hour
+    except Exception:
+        return 0
+
+
+def _has_consecutive_loss(journal: list, n: int = 3) -> bool:
+    count = 0
+    for t in journal:
+        if t.get("result") == "loss":
+            count += 1
+            if count >= n:
+                return True
+        else:
+            count = 0
+    return False
+
+
+ICT_WEAKNESS_RULES = [
+    # (태그명, 조건 함수, 설명)
+    ("과매매_감지",
+     lambda s, j: len(j) >= 3 and
+                  len([t for t in j if t.get("result") == "loss"]) >= 2,
+     "하루 손절 2회 이상 감지"),
+
+    ("킬존외_진입",
+     lambda s, j: any(
+         not (2 <= _get_hour(t.get("execTime", 0)) <= 5 or
+              7 <= _get_hour(t.get("execTime", 0)) <= 10)
+         for t in j if t.get("result") == "loss"
+     ),
+     "런던/뉴욕 킬존 외 시간대 손실 거래"),
+
+    ("손절_불규칙",
+     lambda s, j: float(s.get("loss_consistency", 0)) > 2.0,
+     "손절 크기가 들쭉날쭉"),
+
+    ("기대값_음수",
+     lambda s, j: float(s.get("expected_value", 0)) < 0,
+     "전략의 장기 기대값이 음수"),
+
+    ("승률_낮음",
+     lambda s, j: float(s.get("win_rate", 1)) < 0.4,
+     "승률 40% 미만"),
+
+    ("수익률_낮음",
+     lambda s, j: float(s.get("avg_return_rate", 1)) < 1.0,
+     "평균 수익률 1% 미만"),
+
+    ("연속손실_패턴",
+     lambda s, j: _has_consecutive_loss(j, n=3),
+     "3회 이상 연속 손절"),
 ]
 
 
@@ -184,22 +226,21 @@ def weakness_detect_node(state: dict) -> dict:
     session_id = state.get("session_id", "default")
     logger.info("weakness_detect_node start | session_id=%s", session_id)
 
-    stats = state.get("stats", {})
-    past  = state.get("past_weaknesses", [])
+    stats           = state.get("stats", {})
+    past            = state.get("past_weaknesses", [])
+    journal_entries = state.get("journal_entries", [])
 
     if "error" in stats:
         logger.warning("weakness_detect_node: stats contains error, skipping")
         return {"weaknesses": [], "concept_not_found": False}
 
     current: list[str] = []
-    for key, check, tag in _WEAKNESS_RULES:
-        val = stats.get(key)
-        if val is not None and check(val):
-            current.append(tag)
-
-    worst = stats.get("worst_setup", "")
-    if worst:
-        current.append(f"{worst}_개선필요")
+    for tag, condition, _ in ICT_WEAKNESS_RULES:
+        try:
+            if condition(stats, journal_entries):
+                current.append(tag)
+        except Exception as e:
+            logger.warning("weakness rule error [%s]: %s", tag, e)
 
     recurring = [w for w in current if w in past]
     new_ones  = [w for w in current if w not in past]
