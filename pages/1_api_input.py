@@ -10,10 +10,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🔑 Bybit API 연결")
-st.caption("API 키는 브라우저 세션에만 임시 저장됩니다.")
+st.title("📊 TradeCoach")
+st.markdown(
+    "Bybit 거래 데이터를 자동 수집하고 **ICT 원칙** 기반으로 매매를 분석합니다.  \n"
+    "약점 패턴 탐지 · A+ 셋업 채점 · 맞춤 코칭 · 오늘의 퀴즈까지 제공합니다."
+)
 
 st.divider()
+
+st.subheader("🔑 Bybit API 연결")
+st.caption("API 키는 브라우저 세션에만 임시 저장됩니다.")
 
 with st.form("api_form"):
     api_key = st.text_input("API Key", type="password", placeholder="Bybit API Key")
