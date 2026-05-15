@@ -15,15 +15,15 @@ def _format_journal_entry(trade):
                "뉴욕 세션" if 7 <= h <= 10 else
                "뉴욕 오후" if 13 <= h <= 16 else "세션 외")
     pnl    = float(trade.get("closedPnl", 0))
-    result = "익절" if pnl > 0 else "손절"
+    result = "win" if pnl > 0 else "loss"
     return {
         "date":         kt,
         "symbol":       trade.get("symbol", ""),
         "direction":    trade.get("direction", "Long"),
         "result":       result,
         "entry_reason": f"{kt} {session} {trade.get('symbol')} {trade.get('direction', 'Long')} 진입. 진입가 {trade.get('execPrice')}.",
-        "exit_reason":  f"청산가 {trade.get('exitPrice', '')}, 실현손익 ${pnl:+.2f} ({result}).",
-        "reflection":   f"{session} {'킬존 내' if session != '세션 외' else '킬존 외'} {result} 마감.",
+        "exit_reason":  f"청산가 {trade.get('exitPrice', '')}, 실현손익 ${pnl:+.2f} ({'익절' if pnl > 0 else '손절'}).",
+        "reflection":   f"{session} {'킬존 내' if session != '세션 외' else '킬존 외'} {'익절' if pnl > 0 else '손절'} 마감.",
         "rr":           float(trade.get("rr", 0)),
         "execTime":     ms,
         "closedPnl":    pnl,
