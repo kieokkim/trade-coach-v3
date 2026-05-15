@@ -113,6 +113,17 @@ with st.sidebar.expander("📊 대시보드", expanded=True):
     c3.metric("수익금",      pnl_display)
     c4.metric("손절 일관성", f"{stats.get('loss_consistency', 0):.2f}")
 
+    kpi_desc_html = """
+<div style="background:#1E2A3A;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:11px;line-height:1.8;color:#A8B8C8">
+<b style="color:#7EB8D4">📐 지표 설명</b><br>
+<b>승률</b> = 익절 건수 ÷ 전체 거래 건수 × 100<br>
+<b>평균 수익률</b> = closedPnl ÷ execValue × 100 (투자금 대비 수익률)<br>
+<b>수익금</b> = closedPnl 합계 (수수료 제외 실현 손익)<br>
+<b>손절 일관성</b> = 손실 표준편차 ÷ 평균손실 (낮을수록 규칙적)
+</div>
+"""
+    st.markdown(kpi_desc_html, unsafe_allow_html=True)
+
     weaknesses = st.session_state.get("last_weaknesses", [])
     if weaknesses:
         st.caption("⚠️ 약점")
