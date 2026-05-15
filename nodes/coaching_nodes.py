@@ -44,7 +44,7 @@ _coach_llm = None
 def _get_coach_llm():
     global _coach_llm
     if _coach_llm is None:
-        _coach_llm = get_llm(temperature=0.3)
+        _coach_llm = get_llm(task="complex", temperature=0.3)
     return _coach_llm
 
 

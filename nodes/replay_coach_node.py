@@ -26,7 +26,7 @@ _llm = None
 def _get_llm():
     global _llm
     if _llm is None:
-        _llm = get_llm(temperature=0.3).bind(max_tokens=300)
+        _llm = get_llm(task="complex", temperature=0.3).bind(max_tokens=300)
     return _llm
 
 
