@@ -20,20 +20,6 @@ sample_label = st.session_state.get("sample_label", "")
 if sample_label:
     st.caption(f"모드: {sample_label}")
 
-STATUS_MESSAGES = {
-    "memory_load":          "이전 세션 기록을 불러오는 중...",
-    "new_data_check":       "신규 거래내역을 확인하는 중...",
-    "bybit_fetch":          "거래내역을 수집하는 중...",
-    "preprocess":           "데이터를 정리하는 중...",
-    "journal_write":        "매매일지를 작성하는 중...",
-    "journal_analysis":     "핵심 지표를 분석하는 중...",
-    "weakness_detect":      "약점 패턴을 탐지하는 중...",
-    "performance_analysis": "성과를 요약하는 중...",
-    "backtest_coach":       "ICT 코칭을 생성하는 중...",
-    "quiz_generate":        "퀴즈를 생성하는 중...",
-    "memory_save":          "분석 결과를 저장하는 중...",
-}
-
 progress    = st.progress(0)
 status_text = st.empty()
 
@@ -66,6 +52,7 @@ invoke_state = {
 completed:           list[str] = []
 result:              dict      = {}
 raw_trades_captured: list      = []
+closed_count:        int       = 0
 _total = len(NODE_LABELS)
 
 for chunk in graph.stream(invoke_state, stream_mode="updates"):
@@ -75,22 +62,36 @@ for chunk in graph.stream(invoke_state, stream_mode="updates"):
             result.update(node_output)
             if "raw_trades" in node_output:
                 raw_trades_captured = node_output["raw_trades"]
+                closed_count = len([t for t in raw_trades_captured
+                                    if t.get("closedPnl", "0") != "0"])
 
-        # 메인 화면: 사용자 친화적 메시지 + progress bar
+        n = closed_count
+        STATUS_MESSAGES = {
+            "memory_load":          "이전 세션 기록을 불러오는 중...",
+            "new_data_check":       "신규 거래내역을 확인하는 중...",
+            "bybit_fetch":          f"거래내역 {n}건 수집 완료" if n else "거래내역을 수집하는 중...",
+            "preprocess":           f"{n}건 데이터를 정리하는 중..." if n else "데이터를 정리하는 중...",
+            "journal_write":        f"{n}건 매매일지를 작성하는 중..." if n else "매매일지를 작성하는 중...",
+            "journal_analysis":     f"{n}건 핵심 지표를 분석하는 중..." if n else "핵심 지표를 분석하는 중...",
+            "weakness_detect":      f"{n}건 약점 패턴을 탐지하는 중..." if n else "약점 패턴을 탐지하는 중...",
+            "performance_analysis": "성과를 요약하는 중...",
+            "backtest_coach":       "ICT 코칭을 생성하는 중...",
+            "quiz_generate":        "퀴즈를 생성하는 중...",
+            "memory_save":          "분석 결과를 저장하는 중...",
+        }
+
         status_text.text(STATUS_MESSAGES.get(node_name, "분석 중..."))
         progress.progress(len(completed) / _total)
-
-        # bybit_fetch 완료 직후 거래건수 메시지로 교체
-        if node_name == "bybit_fetch":
-            closed = len([t for t in raw_trades_captured if t.get("closedPnl", "0") != "0"])
-            if not invoke_state.get("last_fetched_at"):
-                status_text.text(f"거래내역 {closed}건을 분석하는 중...")
-            else:
-                status_text.text(f"기존 데이터를 제외한 신규 {closed}건을 분석하는 중...")
 
 # 완료
 status_text.text("✅ 분석 완료!")
 progress.progress(1.0)
+
+if closed_count:
+    if not invoke_state.get("last_fetched_at"):
+        st.info(f"📦 신규 데이터 {closed_count}건 분석 완료")
+    else:
+        st.info(f"📦 기존 데이터를 제외한 신규 {closed_count}건 분석 완료")
 
 # ── 환경 변수 복원 ───────────────────────────────────────────────────────────
 os.environ.pop("TC_SAMPLE_FILE", None)
