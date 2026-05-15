@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -37,7 +38,6 @@ _COL_KO = {
     "closedPnl": "손익(USDT)",
 }
 
-from nodes.quiz_nodes import evaluate_quiz
 from nodes.replay_coach_node import replay_coach_node
 from nodes.coaching_nodes import generate_setup_suggestion
 from ict.fvg_detector import detect_fvg
@@ -111,11 +111,38 @@ with tab1:
     c3.metric("수익금",       pnl_display)
     c4.metric("손절 일관성", f"{stats.get('loss_consistency', 0):.2f}")
 
+    win_rate = stats.get("win_rate", 0)
+    fig_donut = go.Figure(go.Pie(
+        values=[win_rate, max(0, 1 - win_rate)],
+        labels=["승", "패"],
+        hole=0.65,
+        marker_colors=["#2E7D32", "#C62828"],
+        textinfo="none",
+    ))
+    fig_donut.update_layout(
+        showlegend=False,
+        margin=dict(t=0, b=0, l=0, r=0),
+        height=180,
+        annotations=[dict(
+            text=f"{win_rate:.1%}",
+            x=0.5, y=0.5,
+            font_size=20,
+            showarrow=False,
+        )]
+    )
+    st.plotly_chart(fig_donut, use_container_width=True)
+
     weaknesses = st.session_state.get("last_weaknesses", [])
     if weaknesses:
-        st.subheader("⚠️ 감지된 약점")
-        for w in weaknesses:
-            st.info(w)
+        st.caption("⚠️ 감지된 약점")
+        tag_html = " ".join([
+            f'<span style="background:#FFF3CD;color:#856404;'
+            f'padding:2px 10px;border-radius:12px;'
+            f'font-size:12px;margin:2px;display:inline-block">'
+            f'{w}</span>'
+            for w in weaknesses
+        ])
+        st.markdown(tag_html, unsafe_allow_html=True)
 
     action_rule = st.session_state.get("last_action_rule", "")
     if action_rule:
@@ -125,11 +152,21 @@ with tab1:
     setup_analysis = st.session_state.get("last_setup", {})
     if setup_analysis:
         st.subheader("📈 셋업별 수익률")
-        df_setup = pd.DataFrame(
-            list(setup_analysis.items()),
-            columns=["셋업", "평균 수익률 (%)"],
-        ).set_index("셋업")
-        st.bar_chart(df_setup)
+        fig_bar = go.Figure(go.Bar(
+            x=list(setup_analysis.values()),
+            y=list(setup_analysis.keys()),
+            orientation="h",
+            marker_color=[
+                "#2E7D32" if v >= 0 else "#C62828"
+                for v in setup_analysis.values()
+            ],
+        ))
+        fig_bar.update_layout(
+            height=max(150, len(setup_analysis) * 40),
+            margin=dict(t=0, b=0, l=0, r=0),
+            xaxis_title="평균 수익률 (%)",
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
 
     coaching = st.session_state.get("last_coaching", "")
     if coaching:
@@ -137,55 +174,33 @@ with tab1:
         st.write(coaching)
 
     # 퀴즈
-    quiz_question = st.session_state.get("last_quiz_question", "")
-    if quiz_question:
+    quiz_q = st.session_state.get("last_quiz_question", "")
+    if quiz_q:
         st.divider()
-        st.subheader("🧠 개념 확인 퀴즈")
-        st.write(f"**{quiz_question}**")
+        st.subheader("📝 오늘의 퀴즈")
+        try:
+            quiz = json.loads(quiz_q)
+            st.write(quiz["question"])
 
-        quiz_result = st.session_state.get("last_quiz_result", "")
-
-        if not quiz_result:
-            if st.button("💡 힌트 보기", key="quiz_hint_btn"):
-                st.session_state["quiz_show_hint"] = True
-            if st.session_state.get("quiz_show_hint"):
-                concept = st.session_state.get("last_quiz_concept", "")
-                if concept:
-                    st.info(f"힌트: 이 문제는 **{concept}** 개념과 관련이 있습니다.")
-
-            quiz_answer = st.text_input(
-                "답변을 입력하세요",
-                key="quiz_answer_input",
-                placeholder="자유롭게 답변해주세요",
+            selected = st.radio(
+                "보기를 선택하세요",
+                quiz["options"],
+                key="quiz_radio",
+                index=None,
             )
-            if st.button("📝 답변 제출", key="submit_quiz"):
-                if quiz_answer.strip():
-                    with st.spinner("답변 평가 중..."):
-                        result, feedback = evaluate_quiz(
-                            session_id=session_id,
-                            quiz_question=quiz_question,
-                            quiz_answer=quiz_answer,
-                            current_concept=st.session_state.get("last_quiz_concept", ""),
-                            retry_count=st.session_state.get("quiz_retry_count", 0),
-                        )
-                    st.session_state["last_quiz_result"]   = result
-                    st.session_state["last_quiz_feedback"] = feedback
-                    st.rerun()
+
+            if st.button("제출", key="quiz_submit"):
+                correct_idx = quiz["answer"]
+                selected_idx = quiz["options"].index(selected) if selected else -1
+
+                if selected_idx == correct_idx:
+                    st.success(f"✅ 정답! {quiz['options'][correct_idx]}")
                 else:
-                    st.warning("답변을 입력해주세요.")
-        else:
-            feedback = st.session_state.get("last_quiz_feedback", "")
-            if quiz_result == "pass":
-                st.success(f"✅ 정답! {feedback}")
-            else:
-                st.error(f"❌ 다시 생각해보세요. {feedback}")
-                if st.button("🔄 다시 시도", key="retry_quiz"):
-                    retry = st.session_state.get("quiz_retry_count", 0) + 1
-                    st.session_state["quiz_retry_count"] = retry
-                    st.session_state.pop("last_quiz_result",   None)
-                    st.session_state.pop("last_quiz_feedback", None)
-                    st.session_state.pop("quiz_show_hint",     None)
-                    st.rerun()
+                    st.error(f"❌ 오답. 정답은: {quiz['options'][correct_idx]}")
+                with st.expander("해설 보기"):
+                    st.write(quiz["explanation"])
+        except (json.JSONDecodeError, KeyError):
+            st.write(quiz_q)
 
 # ════════════════════════ Tab 2: 거래내역 리스트 + 복기 뷰어 ════════════════
 
@@ -475,10 +490,21 @@ with tab3:
 
     if setup_analysis:
         st.subheader("📈 셋업별 평균 수익률")
-        df_setup = pd.DataFrame(
-            list(setup_analysis.items()), columns=["셋업", "평균 수익률 (%)"]
-        ).set_index("셋업")
-        st.bar_chart(df_setup)
+        fig_bar = go.Figure(go.Bar(
+            x=list(setup_analysis.values()),
+            y=list(setup_analysis.keys()),
+            orientation="h",
+            marker_color=[
+                "#2E7D32" if v >= 0 else "#C62828"
+                for v in setup_analysis.values()
+            ],
+        ))
+        fig_bar.update_layout(
+            height=max(150, len(setup_analysis) * 40),
+            margin=dict(t=0, b=0, l=0, r=0),
+            xaxis_title="평균 수익률 (%)",
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
 
         if best_setup:
             st.success(f"가장 많이 수익난 셋업: **{best_setup}** ({setup_analysis[best_setup]:.2f}%)")
