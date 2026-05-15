@@ -80,12 +80,13 @@ for chunk in graph.stream(invoke_state, stream_mode="updates"):
             "weakness_detect":      f"{n}건 약점 패턴을 탐지하는 중..." if n else "약점 패턴을 탐지하는 중...",
             "performance_analysis": "성과를 요약하는 중...",
             "backtest_coach":       "ICT 코칭을 생성하는 중...",
+            "coaching_judge":       "코칭 내용을 검수하는 중...",
             "quiz_generate":        "퀴즈를 생성하는 중...",
             "memory_save":          "분석 결과를 저장하는 중...",
         }
 
         status_text.text(STATUS_MESSAGES.get(node_name, "분석 중..."))
-        progress.progress(len(completed) / _total)
+        progress.progress(min(len(completed) / _total, 1.0))
 
 # 완료
 status_text.text("✅ 분석 완료!")
