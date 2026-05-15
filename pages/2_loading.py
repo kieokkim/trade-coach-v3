@@ -8,6 +8,12 @@ from utils.constants import NODE_LABELS, sidebar_pipeline_md
 
 st.set_page_config(page_title="TradeCoach | 분석 중", page_icon="⏳", layout="centered")
 
+st.markdown("""
+<style>
+    [data-testid="stSidebarNav"] {display: none;}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("⏳ 데이터 수집 & 분석")
 
 sample_label = st.session_state.get("sample_label", "")

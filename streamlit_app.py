@@ -1,5 +1,11 @@
 import streamlit as st
 
+st.markdown("""
+<style>
+    [data-testid="stSidebarNav"] {display: none;}
+</style>
+""", unsafe_allow_html=True)
+
 # Day2: 멀티페이지로 전환 — 아래 기존 로직은 pages/ 로 이전되었으므로 주석 처리
 st.switch_page("pages/1_api_input.py")
 
