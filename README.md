@@ -1,71 +1,70 @@
-# TradeCoach v2.1
+# TradeCoach v2.2
 
-AI 기반 트레이딩 복기 코치.  
-Bybit API로 매매내역을 자동 수집하고  
-**캔들 복기 뷰어 + FVG 탐지 + LLM 코칭 루프**를 제공합니다.
+AI 기반 트레이딩 복기 코치
+
+## 한 줄 소개
+
+Bybit 거래내역을 자동 분석하고 ICT 이론 기반으로
+반복 실수와 행동 패턴을 교정하는 AI 복기 코치.
+"왜 같은 실수를 반복하는가"에 집중합니다.
 
 ---
 
-## 핵심 기능 (v2.1)
+## 핵심 기능
 
 | 기능 | 설명 |
 |------|------|
-| 🔑 API 연결 / 샘플 체험 | Bybit API Key 입력 또는 샘플 데이터로 즉시 시작 |
-| 📊 KPI 대시보드 | 승률 / 평균 수익률 / 기대값 / 손절 일관성 |
-| 📈 캔들 복기 뷰어 | 진입 전후 캔들 + 진입/청산 마커 (Plotly) |
-| 🟡 FVG 탐지 (rule-based) | Fair Value Gap 자동 탐지 + 차트 오버레이 |
-| 🤖 LLM 복기 코멘트 | ICT 관점 진단 + 개선 제안 (GPT-4o-mini) |
-| 📚 셋업 태깅 | 셋업별 수익률 분석 + 개선 제안 생성 |
+| 거래내역 자동 분석 | Bybit API 수집 + KPI 4가지 (승률 / 수익률 / 수익금 / 손절 일관성) |
+| 거래 복기 뷰어 | Kline API 캔들 복원 + FVG / OB / 추세선 rule-based 탐지 오버레이 |
+| A+ 채점 | ICT 기반 5가지 기준 자동 채점 (구조진입 / 반등확인 / 추세정렬 / 킬존 / 손절규율) |
+| 진입 근거 추론 | 캔들 + ICT 패턴 기반 LLM 자동 추론 |
+| AI-as-Judge | 코칭 결과를 트레이딩 철학 5가지로 자동 검수 |
+| 세션 메모리 | SQLite 기반 약점 누적 추적 + 거래 태그 영구 저장 |
+| 샘플 데이터 3종 | 초보 / 중급 / 고수 트레이더 시나리오 |
 
 ---
 
-## 설치
+## 데모 모드
+
+API 키 없이 3가지 트레이더 시나리오로 즉시 체험 가능:
+
+- 👶 **초보**: 감에 의존, 불규칙한 손절
+- 🧑 **중급**: ICT 기초 이해, 감정적 진입 잔존
+- 🏆 **고수**: ICT 심층 이해, 이성적 판단
+
+---
+
+## 설치 및 실행
 
 ```bash
-# Python 3.13 필요
 uv venv && source .venv/bin/activate
 uv sync
-```
-
-## 환경 설정
-
-```bash
-cp .env.example .env
-# .env에 키 입력:
-# OPENAI_API_KEY=sk-...
-# BYBIT_API_KEY=...      (선택 — 없으면 샘플 데이터 모드)
-# BYBIT_API_SECRET=...   (선택)
-```
-
-## 실행
-
-```bash
-# 멀티페이지 Streamlit 앱
+cp .env.example .env   # API 키 입력 후 저장
 uv run streamlit run streamlit_app.py
 ```
 
-앱이 열리면 자동으로 **API 입력 페이지**로 이동합니다.
+---
 
-```
-1. API Key 입력 또는 "샘플 데이터로 체험하기" 클릭
-2. 로딩 화면에서 데이터 수집 + 분석 진행
-3. 메인 대시보드 3탭 확인
-   - Tab 1: KPI 대시보드
-   - Tab 2: 거래내역 리스트 + 복기 뷰어 (캔들차트 + FVG + LLM 코멘트)
-   - Tab 3: 셋업 태깅 (수익률 분석 + 개선 제안)
+## 환경 변수
+
+```env
+OPENAI_API_KEY=sk-...
+BYBIT_API_KEY=...        # 선택 (없으면 샘플 데이터)
+BYBIT_API_SECRET=...     # 선택
+LLM_PROVIDER=openai      # openai 또는 groq
 ```
 
 ---
 
-## 스크린샷
+## 기술 스택
 
-> _[placeholder] 1_api_input 페이지_
-
-> _[placeholder] 2_loading 페이지 (progress bar)_
-
-> _[placeholder] Tab 2 복기 뷰어 (캔들차트 + FVG 오버레이 + LLM 코멘트)_
-
-> _[placeholder] Tab 3 셋업 태깅 (bar_chart + 개선 제안)_
+| 영역 | 기술 |
+|------|------|
+| AI 파이프라인 | LangGraph / LangChain / OpenAI GPT-4o-mini |
+| 거래소 연동 | Bybit V5 API (pybit) |
+| 프론트엔드 | Streamlit / Plotly |
+| 저장소 | SQLite |
+| 런타임 | Python 3.13 / uv |
 
 ---
 
@@ -73,50 +72,34 @@ uv run streamlit run streamlit_app.py
 
 ```
 trade-coach-v3/
-├── streamlit_app.py        # 진입점 → pages/1_api_input.py 리다이렉트
-├── pages/
-│   ├── 1_api_input.py      # API 연결 / 샘플 시작
-│   ├── 2_loading.py        # 데이터 수집 + graph.invoke
-│   └── 3_main.py           # KPI / 복기 뷰어 / 셋업 태깅
-├── graph.py                # TradeCoachState + LangGraph 정의
-├── nodes/                  # 노드 구현
-│   ├── fetch_nodes.py
-│   ├── preprocess_nodes.py
-│   ├── analysis_nodes.py
-│   ├── coaching_nodes.py   # backtest_coach + setup suggestion
-│   ├── replay_coach_node.py  # LLM 복기 코멘트
-│   └── ...
-├── ict/
-│   └── fvg_detector.py     # Rule-based FVG 탐지
-├── market/
-│   └── candles.py          # Bybit Kline API
-├── utils/
-│   └── chart.py            # Plotly 캔들차트 렌더러
-├── data/
-│   └── sample_trades.json  # 샘플 거래 데이터
-├── tools/
-└── db.py
+├── graph.py               # LangGraph 파이프라인
+├── pages/                 # Streamlit 멀티페이지
+│   ├── 1_api_input.py     # 시작 페이지
+│   ├── 2_loading.py       # 로딩
+│   └── 3_main.py          # 복기 뷰어 + 대시보드
+├── nodes/                 # LangGraph 노드
+├── ict/                   # ICT 탐지 (rule-based)
+├── market/                # Kline API
+├── data/                  # 샘플 데이터 + 사전 캔들
+└── docs/                  # 설계 문서
 ```
 
 ---
 
 ## 개발 로드맵
 
-| 버전 | 목표 | 상태 |
+| 버전 | 상태 | 내용 |
 |------|------|------|
-| v2.0 | MVP 안정화 | ✅ 완료 |
-| v2.1 | Replay Foundation — 복기 뷰어 + FVG 탐지 | ✅ 완료 |
-| v2.2 | ICT Detector — OB/MSS/Liquidity 추가 탐지 | 🔜 예정 |
-| v2.3 | Replay Coach — candle-by-candle 복기 | 🔜 예정 |
-| v3.0 | A+ Setup Memory — 개인 셋업 라이브러리 | 🔜 예정 |
+| v2.0 | ✅ | MVP — KPI 분석 + ICT 코칭 + 세션 메모리 |
+| v2.1 | ✅ | 복기 뷰어 — Kline 캔들 + FVG/OB 탐지 |
+| v2.2 | ✅ | A+ 채점 + 진입 근거 추론 + AI-as-Judge |
+| v2.3 | 🔜 | Replay Coach — candle-by-candle 복기 |
+| v3.0 | 🔜 | 기간별 대시보드 + 장기 패턴 분석 |
 
 ---
 
-## 문서 체계
+## 문서
 
-| 문서 | 역할 |
-|------|------|
-| `DECISION_LOG.md` | 아키텍처 결정 이력 |
-| `FUTURE_ROADMAP.md` | v2.2~v3 개발 계획 |
-| `docs/09_프로젝트_작업_지침_v2.1.docx` | 코딩 원칙 / 브랜치 전략 |
-| `docs/01_LangGraph_상세_노드_설계서_v2.1.docx` | 노드 설계 명세 |
+- `DECISION_LOG.md`: 아키텍처 결정 이력
+- `FUTURE_ROADMAP.md`: 개발 계획
+- `docs/`: 상세 설계 문서
