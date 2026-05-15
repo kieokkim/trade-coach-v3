@@ -291,10 +291,24 @@ with tab2:
         st.caption("복기할 트레이드 쌍이 없습니다. (raw_trades에 Buy/Sell 쌍 필요)")
     else:
         pair_labels = [_pair_label(tid, b, s) for tid, b, s in trade_pairs]
-        selected_label = st.selectbox("트레이드 선택", pair_labels, key="replay_select")
+
+        if "replay_selected" not in st.session_state:
+            st.session_state["replay_selected"] = pair_labels[0] if pair_labels else None
+
+        selected_label = st.selectbox(
+            "트레이드 선택",
+            pair_labels,
+            key="replay_select",
+            index=pair_labels.index(st.session_state["replay_selected"])
+                  if st.session_state["replay_selected"] in pair_labels else 0,
+        )
+        st.session_state["replay_selected"] = selected_label
         sel_idx = pair_labels.index(selected_label)
 
         if st.button("▶ 복기 시작", type="primary", key="replay_btn"):
+            st.session_state["replay_open"] = True
+
+        if st.session_state.get("replay_open"):
             sel_trade_id, buy_t, sell_t = trade_pairs[sel_idx]
             symbol   = buy_t.get("symbol", "BTCUSDT")
             entry_ms = int(buy_t.get("execTime",  0))
