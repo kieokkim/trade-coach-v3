@@ -256,18 +256,46 @@ else:
     st.session_state["replay_selected"] = selected_label
     sel_idx = pair_labels.index(selected_label)
 
-    if st.button("▶ 복기 시작", type="primary", key="replay_btn"):
+    sel_trade_id, buy_t, sell_t = trade_pairs[sel_idx]
+    symbol   = buy_t.get("symbol", "BTCUSDT")
+    entry_ms = int(buy_t.get("execTime",  0))
+    exit_ms  = int(sell_t.get("execTime", 0))
+    order_id = buy_t.get("orderId", "")
+    cache_key       = f"replay_{order_id or str(entry_ms)}"
+    cache_key_aplus = f"aplus_{order_id}"
+
+    if st.button("▶ 복기 시작", type="primary", key="btn_replay_start"):
         st.session_state["replay_open"] = True
+        if cache_key not in st.session_state:
+            with st.spinner("캔들 데이터 수집 중..."):
+                st.session_state[cache_key] = get_candles(
+                    symbol, entry_ms, interval="15", limit=50,
+                    order_id=order_id,
+                    sample_mode=st.session_state.get("sample_mode") is not None,
+                )
+        if cache_key_aplus not in st.session_state:
+            _c    = st.session_state[cache_key]
+            _fvgs = detect_fvg(_c)
+            _obs  = detect_ob(_c)
+            _tl   = detect_trendline(_c)
+            with st.spinner("A+ 채점 중..."):
+                try:
+                    st.session_state[cache_key_aplus] = entry_reason_node(
+                        candles=_c,
+                        ict_patterns={"fvg_zones": _fvgs, "ob_zones": _obs, "trend_info": _tl},
+                        trade={
+                            "symbol":    symbol,
+                            "side":      buy_t.get("side", ""),
+                            "execPrice": buy_t.get("execPrice", 0),
+                            "execTime":  buy_t.get("execTime",  0),
+                            "closedPnl": sell_t.get("closedPnl", 0),
+                        },
+                        session_id=session_id,
+                    )
+                except Exception:
+                    st.session_state[cache_key_aplus] = None
 
     if st.session_state.get("replay_open"):
-        sel_trade_id, buy_t, sell_t = trade_pairs[sel_idx]
-        symbol   = buy_t.get("symbol", "BTCUSDT")
-        entry_ms = int(buy_t.get("execTime",  0))
-        exit_ms  = int(sell_t.get("execTime", 0))
-        order_id = buy_t.get("orderId", "")
-
-        # 캔들 캐싱
-        cache_key = f"replay_{order_id or str(entry_ms)}"
         if cache_key not in st.session_state:
             with st.spinner("캔들 데이터 수집 중..."):
                 st.session_state[cache_key] = get_candles(
@@ -280,7 +308,7 @@ else:
         obs     = detect_ob(candles)
         tl      = detect_trendline(candles)
 
-        # 캔들차트 + ICT 오버레이
+        # ── 캔들차트 + ICT 오버레이 ──
         df_c = pd.DataFrame(candles)
         df_c["dt"] = pd.to_datetime(df_c["timestamp"], unit="ms", utc=True)
 
@@ -380,18 +408,61 @@ else:
         )
         st.plotly_chart(fig, use_container_width=True, key=f"candle_{order_id}")
 
-        # 자동 셋업 태깅
+        # ── A+ 채점 결과 ──
+        aplus_result = st.session_state.get(cache_key_aplus)
+        if aplus_result:
+            score = aplus_result["aplus_score"]
+            score_color = "#2E7D32" if score >= 4 else "#E65100" if score >= 2 else "#C62828"
+            st.markdown(
+                f'<h3 style="color:{score_color}">A+ 점수: {score}/5</h3>',
+                unsafe_allow_html=True,
+            )
+            bd = aplus_result["aplus_breakdown"]
+            CRITERIA_DESC = {
+                "structure_entry": ("구조 진입", "FVG 또는 OB 구조권 내 진입"),
+                "bounce_confirm":  ("반등 확인", "진입 전 캔들 반등 1개 이상 확인"),
+                "trend_aligned":   ("추세 정렬", "상위 타임프레임 추세 방향과 일치"),
+                "killzone":        ("킬존",      "런던(02-05 UTC) 또는 뉴욕(07-10 UTC) 세션"),
+                "stop_discipline": ("손절 규율", "당일 손절 횟수 3회 미만"),
+            }
+            desc_html = '<div style="background:#1E2A3A;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:11px;line-height:1.9;color:#A8B8C8">'
+            desc_html += '<b style="color:#7EB8D4">📐 A+ 채점 기준</b><br>'
+            for _k, (_label, _desc) in CRITERIA_DESC.items():
+                icon = "✅" if bd.get(_k) else "❌"
+                desc_html += f"{icon} <b>{_label}</b>: {_desc}<br>"
+            desc_html += "</div>"
+            st.markdown(desc_html, unsafe_allow_html=True)
+
+        # ── ICT 복기 분석 ──
+        st.markdown("#### 🔍 ICT 복기 분석")
+        if aplus_result:
+            st.info(f"**진입 근거:** {aplus_result['entry_reason']}")
+            st.warning(f"**코칭:** {aplus_result['coaching']}")
+        else:
+            pnl = float(sell_t.get("closedPnl", 0) or 0)
+            selected_trade = {
+                "symbol":      symbol,
+                "side":        buy_t.get("side", ""),
+                "entry_price": float(buy_t.get("execPrice",  0)),
+                "exit_price":  float(sell_t.get("execPrice", 0)),
+                "closed_pnl":  pnl,
+                "result":      "win" if pnl > 0 else "loss",
+                "entry_ms":    entry_ms,
+            }
+            with st.spinner("복기 코멘트 생성 중..."):
+                comment = replay_coach_node(candles, {"fvg_zones": fvgs, "ob_zones": obs}, selected_trade)
+            st.info(comment)
+
+        # ── 자동 감지 셋업 ──
         detected_setups = []
         if fvgs: detected_setups.append("FVG")
         if obs:  detected_setups.append("OB")
         auto_setup = "+".join(detected_setups) if detected_setups else "확인필요"
         st.badge(f"자동 감지 셋업: {auto_setup}")
 
-        _oid = buy_t.get("orderId", "")
-        save_trade_tag(session_id, _oid, symbol, auto_setup, user_confirmed=0)
-        st.session_state["trade_tags"][_oid] = {"tag": auto_setup, "confirmed": 0}
+        save_trade_tag(session_id, order_id, symbol, auto_setup, user_confirmed=0)
+        st.session_state["trade_tags"][order_id] = {"tag": auto_setup, "confirmed": 0}
 
-        # 패턴 탐지 결과
         col_fvg, col_ob, col_tl = st.columns(3)
         with col_fvg:
             if fvgs:
@@ -424,12 +495,8 @@ else:
             else:
                 st.info("추세선 없음")
 
-        # 매매일지 expander
         journal_entries = st.session_state.get("last_journal_entries", [])
-        matching = [
-            e for e in journal_entries
-            if e.get("symbol") == symbol
-        ]
+        matching = [e for e in journal_entries if e.get("symbol") == symbol]
         if matching:
             with st.expander("📒 매매일지"):
                 for entry in matching:
@@ -437,70 +504,16 @@ else:
                     st.write(f"**청산 근거**: {entry.get('exit_reason', '') or '추론 불가'}")
                     st.write(f"**회고**: {entry.get('reflection', '') or '-'}")
 
-        # 복기 코멘트
-        pnl = float(sell_t.get("closedPnl", 0) or 0)
-        selected_trade = {
-            "symbol":      symbol,
-            "side":        buy_t.get("side", ""),
-            "entry_price": float(buy_t.get("execPrice",  0)),
-            "exit_price":  float(sell_t.get("execPrice", 0)),
-            "closed_pnl":  pnl,
-            "result":      "win" if pnl > 0 else "loss",
-            "entry_ms":    entry_ms,
-        }
-        ict_patterns = {"fvg_zones": fvgs, "ob_zones": obs}
-
-        with st.spinner("복기 코멘트 생성 중..."):
-            comment = replay_coach_node(candles, ict_patterns, selected_trade)
-        st.info(comment)
-
-        # 태그 확정
+        # ── 태그 확인/수정 ──
         _tag_options = ["FVG", "OB", "FVG+OB", "추세추종", "확인필요", "셋업없음"]
         _default_idx = _tag_options.index(auto_setup) if auto_setup in _tag_options else 4
         user_tag = st.selectbox(
             "태그 확인/수정",
             _tag_options,
             index=_default_idx,
-            key=f"user_tag_{_oid}",
+            key=f"user_tag_{order_id}",
         )
-        if st.button("✅ 태그 확정", key=f"confirm_tag_{_oid}"):
-            save_trade_tag(session_id, _oid, symbol, user_tag, user_confirmed=1)
-            st.session_state["trade_tags"][_oid] = {"tag": user_tag, "confirmed": 1}
+        if st.button("✅ 태그 확정", key=f"confirm_tag_{order_id}"):
+            save_trade_tag(session_id, order_id, symbol, user_tag, user_confirmed=1)
+            st.session_state["trade_tags"][order_id] = {"tag": user_tag, "confirmed": 1}
             st.success(f"태그 저장: {user_tag}")
-
-        # A+ 채점
-        st.divider()
-        cache_key_aplus = f"aplus_{order_id}"
-        if st.button("🏆 A+ 채점 + 진입 근거 분석", key=f"btn_{cache_key_aplus}"):
-            with st.spinner("분석 중..."):
-                st.session_state[cache_key_aplus] = entry_reason_node(
-                    candles=candles,
-                    ict_patterns={"fvg_zones": fvgs, "ob_zones": obs, "trend_info": tl},
-                    trade={
-                        "symbol":    symbol,
-                        "side":      buy_t.get("side", ""),
-                        "execPrice": buy_t.get("execPrice", 0),
-                        "execTime":  buy_t.get("execTime",  0),
-                        "closedPnl": sell_t.get("closedPnl", 0),
-                    },
-                    session_id=session_id,
-                )
-
-        if cache_key_aplus in st.session_state:
-            r     = st.session_state[cache_key_aplus]
-            score = r["aplus_score"]
-            color = "#2E7D32" if score >= 4 else "#E65100" if score >= 2 else "#C62828"
-            st.markdown(
-                f'<h3 style="color:{color}">A+ 점수: {score}/5</h3>',
-                unsafe_allow_html=True,
-            )
-            bd = r["aplus_breakdown"]
-            labels = [
-                ("구조 진입", "structure_entry"), ("반등 확인", "bounce_confirm"),
-                ("추세 정렬", "trend_aligned"),   ("킬존",     "killzone"),
-                ("손절 규율", "stop_discipline"),
-            ]
-            for col, (label, key) in zip(st.columns(5), labels):
-                col.metric(label, "✅" if bd.get(key) else "❌")
-            st.info(f"**진입 근거:** {r['entry_reason']}")
-            st.warning(f"**코칭:** {r['coaching']}")
