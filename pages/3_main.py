@@ -140,29 +140,37 @@ with st.sidebar.expander("📊 대시보드", expanded=True):
     if action_rule:
         st.success(f"★ {action_rule}")
 
-    coaching = st.session_state.get("last_coaching", "")
-    if coaching:
-        st.divider()
-        st.caption("💬 코칭 피드백")
-        st.write(coaching)
+    st.divider()
+    st.markdown("**📋 트레이딩 철학**")
+    PHILOSOPHY = [
+        "하루 3번 이상 손절 시 당일 거래 중단",
+        "매 거래 최대 손실금액 사전 고정",
+        "Revenge Trading 절대 금지",
+        "No Setup = No Trade",
+        "손절선은 진입 전에 결정",
+    ]
+    for rule in PHILOSOPHY:
+        st.markdown(f"✅ {rule}")
 
-        judge_result = res.get("judge_result", "")
-        judge_passed = res.get("judge_passed", True)
-        judge_scores = res.get("judge_scores", {})
-        if judge_result:
-            if judge_passed:
-                st.success(f"✅ {judge_result}")
-            else:
-                st.warning(f"⚠️ {judge_result}")
-                _SCORE_LABELS = {
-                    "daily_stop":        "일일 손절",
-                    "fixed_loss":        "손실 고정",
-                    "no_revenge":        "복수매매",
-                    "no_setup_no_trade": "셋업 필수",
-                    "stop_first":        "손절선 사전",
-                }
-                for key, label in _SCORE_LABELS.items():
-                    st.write(f"{'✅' if judge_scores.get(key) else '❌'} {label}")
+    st.divider()
+
+    st.markdown("**📐 ICT 핵심 원칙**")
+    ICT_RULES = [
+        ("🕐", "킬존 진입",  "런던 02-05 UTC / 뉴욕 07-10 UTC"),
+        ("📊", "구조적 진입", "FVG 또는 OB 구간 내 진입"),
+        ("📈", "추세 정렬",  "상위 추세 방향으로만 진입"),
+        ("🛡️", "손절 위치",  "구조적 레벨(FVG/OB 하단) 바깥"),
+    ]
+    for icon, title, desc in ICT_RULES:
+        st.markdown(f"{icon} **{title}**: {desc}")
+
+    judge_result = res.get("judge_result", "")
+    judge_passed = res.get("judge_passed", True)
+    if judge_result:
+        if judge_passed:
+            st.success(f"✅ {judge_result}")
+        else:
+            st.warning(f"⚠️ 보완 필요: {judge_result}")
 
 # ③ 퀴즈 expander
 quiz_q = st.session_state.get("last_quiz_question", "")
