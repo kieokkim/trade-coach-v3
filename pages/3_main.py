@@ -46,6 +46,7 @@ from ict.trend_detector import detect_trendline
 from market.candles import get_candles
 from utils.chart import render_candle_chart
 from utils.constants import NODE_LABELS, sidebar_pipeline_md
+from db import save_trade_tag, load_trade_tags
 
 st.set_page_config(page_title="TradeCoach | 대시보드", page_icon="📊", layout="wide")
 
@@ -58,6 +59,9 @@ if "last_result" not in st.session_state:
 
 session_id = st.session_state.get("session_id", "default")
 res        = st.session_state["last_result"]
+
+if "trade_tags" not in st.session_state:
+    st.session_state["trade_tags"] = load_trade_tags(session_id)
 
 # ── 전역: Buy/Sell 페어링 ────────────────────────────────────────────────────
 raw_trades  = res.get("raw_trades", [])
@@ -409,6 +413,11 @@ with tab2:
             st.session_state[f"setup_tag_{sel_trade_id}"] = auto_setup
             st.badge(f"자동 감지 셋업: {auto_setup}")
 
+            # DB 자동 저장 (user_confirmed=0)
+            _oid = buy_t.get("orderId", "")
+            save_trade_tag(session_id, _oid, symbol, auto_setup, user_confirmed=0)
+            st.session_state["trade_tags"][_oid] = {"tag": auto_setup, "confirmed": 0}
+
             # 패턴 탐지 결과 표시
             col_fvg, col_ob, col_tl = st.columns(3)
             with col_fvg:
@@ -458,6 +467,20 @@ with tab2:
             with st.spinner("복기 코멘트 생성 중..."):
                 comment = replay_coach_node(candles, ict_patterns, selected_trade)
             st.info(comment)
+
+            # 사용자 태그 확인/수정
+            _tag_options = ["FVG", "OB", "FVG+OB", "추세추종", "확인필요", "셋업없음"]
+            _default_idx = _tag_options.index(auto_setup) if auto_setup in _tag_options else 4
+            user_tag = st.selectbox(
+                "태그 확인/수정",
+                _tag_options,
+                index=_default_idx,
+                key=f"user_tag_{_oid}",
+            )
+            if st.button("✅ 태그 확정", key=f"confirm_tag_{_oid}"):
+                save_trade_tag(session_id, _oid, symbol, user_tag, user_confirmed=1)
+                st.session_state["trade_tags"][_oid] = {"tag": user_tag, "confirmed": 1}
+                st.success(f"태그 저장: {user_tag}")
 
 # ═══════════════════════════ Tab 3: 셋업 태깅 ══════════════════════════════
 

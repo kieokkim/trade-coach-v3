@@ -1,6 +1,7 @@
 import logging
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "tradecoach.db"
@@ -98,3 +99,57 @@ def init_db() -> None:
             conn.execute("ALTER TABLE weaknesses ADD COLUMN category TEXT DEFAULT 'ict'")
         except Exception:
             pass
+
+        # journal_entries ict_tag 컬럼
+        try:
+            conn.execute("ALTER TABLE journal_entries ADD COLUMN ict_tag TEXT DEFAULT ''")
+        except Exception:
+            pass
+
+        # trade_tags 테이블
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS trade_tags (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id     TEXT    NOT NULL,
+                order_id       TEXT    NOT NULL,
+                symbol         TEXT,
+                ict_tag        TEXT    DEFAULT '',
+                user_confirmed INTEGER DEFAULT 0,
+                created_at     TEXT,
+                UNIQUE(session_id, order_id)
+            )
+        """)
+
+
+def save_trade_tag(
+    session_id: str,
+    order_id: str,
+    symbol: str,
+    ict_tag: str,
+    user_confirmed: int = 0,
+) -> None:
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO trade_tags (session_id, order_id, symbol, ict_tag, user_confirmed, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_id, order_id) DO UPDATE SET
+                ict_tag=excluded.ict_tag,
+                user_confirmed=excluded.user_confirmed
+            """,
+            (session_id, order_id, symbol, ict_tag, user_confirmed,
+             datetime.utcnow().isoformat()),
+        )
+
+
+def load_trade_tags(session_id: str) -> dict:
+    """orderId → {"tag": str, "confirmed": int} 딕셔너리 반환"""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT order_id, ict_tag, user_confirmed FROM trade_tags WHERE session_id=?",
+            (session_id,),
+        ).fetchall()
+    return {
+        r["order_id"]: {"tag": r["ict_tag"], "confirmed": r["user_confirmed"]}
+        for r in rows
+    }
