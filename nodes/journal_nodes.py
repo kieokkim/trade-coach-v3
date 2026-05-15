@@ -40,4 +40,4 @@ def journal_write_node(state: dict) -> dict:
     entries = [_format_journal_entry(t) for t in closed]
 
     logger.info("journal_write_node end | session_id=%s entries=%d", session_id, len(entries))
-    return {"journal_entries": entries, "journal_data": "rule-based"}
+    return {"journal_entries": entries}
