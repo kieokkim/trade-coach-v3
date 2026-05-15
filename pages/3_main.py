@@ -279,7 +279,7 @@ else:
                 st.session_state[cache_key] = get_candles(
                     symbol, entry_ms, interval="15", limit=50,
                     order_id=order_id,
-                    sample_mode=st.session_state.get("sample_mode") is not None,
+                    sample_mode=st.session_state.get("sample_mode", ""),
                 )
         if cache_key_aplus not in st.session_state:
             _c    = st.session_state[cache_key]
@@ -309,7 +309,7 @@ else:
                 st.session_state[cache_key] = get_candles(
                     symbol, entry_ms, interval="15", limit=50,
                     order_id=order_id,
-                    sample_mode=st.session_state.get("sample_mode") is not None,
+                    sample_mode=st.session_state.get("sample_mode", ""),
                 )
         candles = st.session_state[cache_key]
         fvgs    = detect_fvg(candles)

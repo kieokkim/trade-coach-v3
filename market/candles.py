@@ -7,21 +7,28 @@ from pybit.unified_trading import HTTP
 
 logger = logging.getLogger(__name__)
 
-_SAMPLE_CANDLES_PATH = Path(__file__).parent.parent / "data" / "sample_candles.json"
-_sample_candles_cache = None
+CANDLE_FILE_MAP = {
+    "sample_1":     "data/sample_candles.json",
+    "sample_2":     "data/sample_candles.json",
+    "beginner":     "data/sample_candles_beginner.json",
+    "intermediate": "data/sample_candles_intermediate.json",
+    "expert":       "data/sample_candles_expert.json",
+}
+
+_ROOT = Path(__file__).parent.parent
+_sample_candles_cache: dict = {}
 
 
-def _load_sample_candles_cache() -> dict:
-    global _sample_candles_cache
-    if _sample_candles_cache is None:
+def _load_sample_candles_cache(sample_mode: str) -> dict:
+    if sample_mode not in _sample_candles_cache:
+        rel = CANDLE_FILE_MAP.get(sample_mode, "data/sample_candles.json")
+        path = _ROOT / rel
         try:
-            _sample_candles_cache = json.loads(
-                _SAMPLE_CANDLES_PATH.read_text(encoding="utf-8")
-            )
+            _sample_candles_cache[sample_mode] = json.loads(path.read_text(encoding="utf-8"))
         except Exception as e:
-            logger.warning("sample_candles.json 로드 실패: %s", e)
-            _sample_candles_cache = {}
-    return _sample_candles_cache
+            logger.warning("sample_candles load failed [%s]: %s", sample_mode, e)
+            _sample_candles_cache[sample_mode] = {}
+    return _sample_candles_cache[sample_mode]
 
 
 def _generate_dummy_candles(entry_time_ms: int, limit: int = 50, interval: str = "15") -> list[dict]:
@@ -50,14 +57,15 @@ def get_candles(
     interval: str = "15",
     limit: int = 50,
     order_id: str | None = None,
-    sample_mode: bool = False,
+    sample_mode: str | bool = False,
 ) -> list[dict]:
     if sample_mode and order_id:
-        cache = _load_sample_candles_cache()
+        mode_key = sample_mode if isinstance(sample_mode, str) else "sample_1"
+        cache = _load_sample_candles_cache(mode_key)
         if order_id in cache and cache[order_id]:
-            logger.info("get_candles: sample cache hit | order_id=%s", order_id)
+            logger.info("get_candles: sample cache hit | order_id=%s mode=%s", order_id, mode_key)
             return cache[order_id]
-        logger.warning("get_candles: sample cache miss | order_id=%s", order_id)
+        logger.warning("get_candles: sample cache miss | order_id=%s mode=%s", order_id, mode_key)
         return _generate_dummy_candles(entry_time_ms, limit, interval)
 
     start = entry_time_ms - (int(interval) * 60 * 1000 * (limit // 2))
