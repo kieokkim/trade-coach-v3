@@ -39,7 +39,7 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown("**👶 초보 트레이더**")
-    st.caption("감에 의존 · 승률 25%")
+    st.caption("감에 의존 · 불규칙한 손절")
     if st.button("체험하기", key="btn_beginner", use_container_width=True):
         st.session_state["sample_mode"]  = "beginner"
         st.session_state["sample_label"] = "초보 트레이더 데모"
@@ -47,7 +47,7 @@ with col1:
 
 with col2:
     st.markdown("**🧑 중급 트레이더**")
-    st.caption("ICT 기초 · 승률 42%")
+    st.caption("ICT 기초 이해 · 감정적 진입")
     if st.button("체험하기", key="btn_intermediate", use_container_width=True):
         st.session_state["sample_mode"]  = "intermediate"
         st.session_state["sample_label"] = "중급 트레이더 데모"
@@ -55,7 +55,7 @@ with col2:
 
 with col3:
     st.markdown("**🏆 고수 트레이더**")
-    st.caption("ICT 심층 · 승률 67%")
+    st.caption("ICT 심층 이해 · 이성적 판단")
     if st.button("체험하기", key="btn_expert", use_container_width=True):
         st.session_state["sample_mode"]  = "expert"
         st.session_state["sample_label"] = "고수 트레이더 데모"
