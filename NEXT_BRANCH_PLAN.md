@@ -1,6 +1,6 @@
 # TradeCoach — Next Branch Plan
 
-> 새 레포(trade-coach-replay) 기준 브랜치 전략
+> `trade-coach-v3` 기준 브랜치 전략
 > 결정 이유: DECISION_LOG.md 참고
 
 ---
@@ -10,21 +10,22 @@
 | 레포 | 역할 | 상태 |
 |------|------|------|
 | `kieokkim/trade-coach` | v2.0 안정 버전 | ✅ main 태그 v2.0 |
-| `kieokkim/trade-coach-replay` | v2.1+ 개발 | 🔄 진행 중 |
+| `kieokkim/trade-coach-v3` | v2.1+ 개발 | 🔄 v2.2 완료 |
 
 ---
 
-## 현재 브랜치
+## 브랜치 현황
 
 ```
-trade-coach-replay/
-  main                           ← v2.0 코드 복제 기준점
-  └── feature/replay-foundation  ← 현재 작업 중
+trade-coach-v3/
+  main                              ← v2.0 코드 기준점
+  ├── feature/replay-foundation     ← v2.1 ✅ 완료
+  └── feature/ict-detector-engine   ← v2.2 ✅ 완료
 ```
 
 ---
 
-## v2.1 작업 순서 (5일 플랜)
+## v2.1 작업 순서 (5일 플랜) ✅ 완료
 
 ### Day 1 — Kline 데이터 수집
 ```
@@ -44,7 +45,7 @@ plotly 캔들차트 + 진입/청산 마커
 
 ### Day 3 — FVG 탐지 + 오버레이
 ```
-ict/fvg_detector.py    # FVG rule-based 탐지 (기본 ICT 패턴)
+ict/fvg_detector.py    # FVG rule-based 탐지
 ict/__init__.py
 캔들차트에 FVG 구간 오버레이
 ```
@@ -65,23 +66,25 @@ Tab 3 셋업 태깅 탭 기초
 
 ---
 
-## v2.2 이후 브랜치
+## 다음 브랜치
 
 ```bash
-# v2.1 완료 후
-git checkout main
-git merge feature/replay-foundation
-git tag v2.1
-
-# v2.2: OB/MSS/Liquidity 탐지
-git checkout -b feature/ict-detector-engine
-
-# v2.3: bar-by-bar Replay (이 단계부터 "Replay" 표현 사용)
+# v2.3: candle-by-candle Replay Coach (이 단계부터 "Replay" 표현 사용)
 git checkout -b feature/replay-coach
 
-# v3.0: A+ Setup Memory
-git checkout -b feature/aplus-setup-memory
+# v3.0: 기간별 대시보드 + 장기 패턴 분석
+git checkout -b feature/dashboard-v2
 ```
+
+### feature/replay-coach (v2.3 예정)
+- 캔들 단계적 표시 (bar-by-bar)
+- "왜 MSS 확인 전에 진입했나요?" 질문 플로우
+- AI 복기 피드백
+
+### feature/dashboard-v2 (기간별 대시보드)
+- 기간별 성과 대시보드 (주간/월간)
+- 장기 반복 약점 추적
+- 패턴 임베딩 + A+ 셋업 유사도 분석
 
 ---
 
@@ -94,13 +97,13 @@ git checkout -b feature/aplus-setup-memory
 
 ---
 
-## 완료 정의 (v2.1 DoD)
+## 완료 정의 (v2.2 DoD) ✅
 
-- [ ] 거래 선택 → 캔들차트 (마커 포함)
-- [ ] FVG 구간 오버레이 (기본 ICT 패턴)
-- [ ] LLM 복기 코멘트 출력
-- [ ] 멀티페이지 흐름 정상
-- [ ] 셋업 태깅 탭 기초 작동
-- [ ] 재방문 시 신규 데이터만 추가
-- [ ] final_notebook.ipynb QA 통과
-- [ ] git tag v2.1 푸시 완료
+- [x] OB / MSS / Liquidity 탐지
+- [x] A+ 채점 5가지 기준 (ICT 기반 rule-based)
+- [x] 캔들 기반 진입 근거 자동 추론
+- [x] AI-as-Judge 코칭 검수
+- [x] 롱/숏 방향 개념 추가
+- [x] ICT 기반 약점 태깅 (종목명 제거)
+- [x] 샘플 데이터 3종 (초보/중급/고수)
+- [x] journal_write rule-based 전환
