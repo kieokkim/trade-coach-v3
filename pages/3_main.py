@@ -214,7 +214,8 @@ if trade_pairs:
         entry_price = float(buy.get("execPrice", 0) or 0)
         exit_price  = float(sell.get("execPrice", 0) or 0)
         qty         = float(buy.get("orderQty", 0) or 0)
-        ret_pct     = (exit_price - entry_price) / entry_price * 100 if entry_price else 0
+        exec_value  = float(sell.get("execValue", 0) or buy.get("execValue", 0) or 0)
+        ret_pct     = round(pnl / exec_value * 100, 2) if exec_value else 0.0
         direction   = buy.get("direction", "Long" if buy.get("side", "Buy") == "Buy" else "Short")
         rows.append({
             "거래번호":      tid,
@@ -225,12 +226,20 @@ if trade_pairs:
             "수량":          qty,
             "결과":          "✅ WIN" if pnl >= 0 else "❌ LOSS",
             "실현손익($)":   f"+${pnl:.2f}" if pnl >= 0 else f"-${abs(pnl):.2f}",
-            "수익률(%)":     round(ret_pct, 2),
+            "수익률(%)":     ret_pct,
             "진입시각(KST)": _ms_to_kst(buy.get("execTime", 0)),
             "청산시각(KST)": _ms_to_kst(sell.get("execTime", 0)),
-            
         })
-    st.dataframe(pd.DataFrame(rows), use_container_width=True)
+    st.dataframe(
+        pd.DataFrame(rows),
+        use_container_width=True,
+        column_config={
+            "진입가":   st.column_config.NumberColumn(format="%.4f"),
+            "청산가":   st.column_config.NumberColumn(format="%.4f"),
+            "수량":     st.column_config.NumberColumn(format="%.4f"),
+            "수익률(%)": st.column_config.NumberColumn(format="%.2f%%"),
+        },
+    )
 elif raw_trades:
     df_trades = pd.DataFrame(raw_trades)
     display_cols = [c for c in ["execTime", "symbol", "side", "execPrice", "orderQty", "closedPnl"]

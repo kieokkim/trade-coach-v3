@@ -15,9 +15,16 @@ logger = logging.getLogger(__name__)
 _llm = None
 
 _ACTION_RULE_SYSTEM = """\
-당신은 트레이딩 코치입니다. 트레이더의 성과 지표를 보고 내일 당장 실행할 구체적인 규칙을 한국어로 한 문장 작성하세요.
-금지 또는 의무 형식으로 작성하세요. 예: "OB 셋업에서 반드시 손절을 지정하세요" 또는 "FVG 셋업 외에는 진입하지 마세요".
-규칙 문장 하나만 출력하세요."""
+당신은 ICT(Inner Circle Trader) 전문 트레이딩 코치입니다.
+트레이더의 감지된 약점과 성과 지표를 바탕으로 내일 실행할 수 있는 구체적인 개선 조언을 한국어로 한 문장 작성하세요.
+
+규칙:
+- 셋업은 반드시 OB(오더블럭), FVG(페어밸류갭), 추세추종 등 ICT 패턴 이름을 사용하세요.
+- BTC, ETH 등 종목명은 절대 언급하지 마세요. 셋업은 패턴이지 종목이 아닙니다.
+- 정중한 코칭 말투로 작성하세요. ("~해 보세요", "~을 권장합니다", "~을 점검해 보세요" 등)
+- 명령형 금지 표현("절대 ~하지 마세요" 등)은 사용하지 마세요.
+- 감지된 약점과 직접 연관된 조언을 작성하세요.
+- 문장 하나만 출력하세요."""
 
 
 def _get_hour(exec_time_ms) -> int:
@@ -159,14 +166,14 @@ def _compute_stats(journal_data: str) -> dict:
     }
 
 
-def _generate_action_rule(stats: dict) -> str:
+def _generate_action_rule(stats: dict, weaknesses: list) -> str:
     try:
+        weakness_str = ", ".join(weaknesses) if weaknesses else "없음"
         summary = (
+            f"감지된 약점: {weakness_str}\n"
             f"승률: {stats.get('win_rate', 0):.1%}, "
             f"평균수익률: {stats.get('avg_return_rate', 0):.2f}%, "
-            f"기대값: {stats.get('expected_value', 0):.2f}%, "
-            f"손절일관성: {stats.get('loss_consistency', 0):.2f}, "
-            f"최악셋업: {stats.get('worst_setup', '') or '없음'}"
+            f"손절일관성: {stats.get('loss_consistency', 0):.2f}"
         )
         msg = _get_llm().invoke([
             SystemMessage(content=_ACTION_RULE_SYSTEM),
@@ -190,7 +197,6 @@ def journal_analysis_node(state: dict) -> dict:
         return {"stats": {"error": "no data"}, "setup_analysis": {}, "action_rule": ""}
 
     stats = _compute_stats(journal_data)
-    action_rule = _generate_action_rule(stats) if "error" not in stats else ""
 
     logger.info(
         "journal_analysis_node end | session_id=%s stats_keys=%s",
@@ -199,7 +205,6 @@ def journal_analysis_node(state: dict) -> dict:
     return {
         "stats":          stats,
         "setup_analysis": stats.get("setup_analysis", {}),
-        "action_rule":    action_rule,
     }
 
 
@@ -252,8 +257,10 @@ def weakness_detect_node(state: dict) -> dict:
         concept_info = search_ict_concept.invoke({"weakness_tag": weaknesses[0]})
         concept_not_found = concept_info.startswith(CONCEPT_NOT_FOUND_PREFIX)
 
+    action_rule = _generate_action_rule(stats, weaknesses) if not ("error" in stats) else ""
+
     logger.info(
         "weakness_detect_node end | session_id=%s weaknesses=%s",
         session_id, weaknesses,
     )
-    return {"weaknesses": weaknesses, "concept_not_found": concept_not_found}
+    return {"weaknesses": weaknesses, "concept_not_found": concept_not_found, "action_rule": action_rule}
