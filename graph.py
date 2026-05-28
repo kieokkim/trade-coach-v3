@@ -10,7 +10,6 @@ from nodes.coaching_judge_node import coaching_judge_node
 from nodes.fetch_nodes import new_data_check_node, bybit_fetch_node
 from nodes.journal_nodes import journal_write_node
 from nodes.memory_nodes import memory_save_node
-from nodes.quiz_nodes import quiz_generate_node
 from nodes.performance_nodes import performance_analysis_node
 from nodes.preprocess_nodes import preprocess_node
 
@@ -29,10 +28,6 @@ class TradeCoachState(TypedDict, total=False):
     past_weaknesses: list         # DB 로드 과거 약점
     chart_feedback:  str          # 차트 분석 결과 텍스트
     current_concept: str          # 현재 학습 중인 개념
-    quiz_question:   str          # 퀴즈 문항
-    quiz_answer:     str          # 사용자 답변
-    quiz_result:     str          # 'pass' | 'fail' | ''
-    retry_count:     int          # 퀴즈 재시도 횟수
     trade_count:     int          # 총 분석 트레이드 수
     improvement_log: list         # 세션별 실력 변화
     messages:        list         # 대화 히스토리
@@ -65,10 +60,6 @@ DEFAULT_STATE: TradeCoachState = {
     "past_weaknesses":   [],
     "chart_feedback":    "",
     "current_concept":   "",
-    "quiz_question":     "",
-    "quiz_answer":       "",
-    "quiz_result":       "",
-    "retry_count":       0,
     "trade_count":       0,
     "improvement_log":   [],
     "messages":          [],
@@ -167,7 +158,6 @@ def _build_graph() -> StateGraph:
     builder.add_node("fallback_classify",    fallback_classify_node)
     builder.add_node("backtest_coach",       backtest_coach_node)
     builder.add_node("coaching_judge",       coaching_judge_node)
-    builder.add_node("quiz_generate",        quiz_generate_node)
     builder.add_node("memory_save",          memory_save_node)
 
     builder.add_edge(START, "memory_load")
@@ -193,8 +183,7 @@ def _build_graph() -> StateGraph:
         {"backtest_coach": "backtest_coach"},
     )
     builder.add_edge("backtest_coach",  "coaching_judge")
-    builder.add_edge("coaching_judge",  "quiz_generate")
-    builder.add_edge("quiz_generate",  "memory_save")
+    builder.add_edge("coaching_judge",  "memory_save")
     builder.add_edge("memory_save", END)
 
     return builder.compile()

@@ -1,4 +1,3 @@
-import json
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -36,14 +35,14 @@ from ict.ob_detector import detect_ob
 from ict.trend_detector import detect_trendline
 from market.candles import get_candles
 from db import save_trade_tag, load_trade_tags
+from utils.styles import (inject_global_css, render_sidebar_brand,
+                           render_dashboard_header, render_kpi_cards,
+                           render_trade_table, render_section_header)
 
 st.set_page_config(page_title="TradeCoach | 대시보드", page_icon="📊", layout="wide")
 
-st.markdown("""
-<style>
-    [data-testid="stSidebarNav"] {display: none;}
-</style>
-""", unsafe_allow_html=True)
+inject_global_css()
+render_sidebar_brand()
 
 # ── 결과 없으면 API 입력 페이지로 ──────────────────────────────────────────
 if "last_result" not in st.session_state:
@@ -106,13 +105,6 @@ total_pnl = sum(float(t.get("closedPnl", 0) or 0) for t in raw_trades)
 pnl_display = f"+${total_pnl:.2f}" if total_pnl >= 0 else f"-${abs(total_pnl):.2f}"
 
 with st.sidebar.expander("📊 대시보드", expanded=True):
-    c1, c2 = st.columns(2)
-    c1.metric("승률",        f"{stats.get('win_rate', 0):.1%}")
-    c2.metric("평균 수익률", f"{stats.get('avg_return_rate', 0):.2f}%")
-    c3, c4 = st.columns(2)
-    c3.metric("수익금",      pnl_display)
-    c4.metric("손절 일관성", f"{stats.get('loss_consistency', 0):.2f}")
-
     kpi_desc_html = """
 <div style="background:#1E2A3A;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:11px;line-height:1.8;color:#A8B8C8">
 <b style="color:#7EB8D4">📐 지표 설명</b><br>
@@ -172,74 +164,39 @@ with st.sidebar.expander("📊 대시보드", expanded=True):
         else:
             st.warning(f"⚠️ 보완 필요: {judge_result}")
 
-# ③ 퀴즈 expander
-quiz_q = st.session_state.get("last_quiz_question", "")
-if quiz_q:
-    with st.sidebar.expander("📝 오늘의 퀴즈", expanded=False):
-        try:
-            quiz = json.loads(quiz_q)
-            st.write(quiz["question"])
-            selected_quiz = st.radio(
-                "보기를 선택하세요",
-                quiz["options"],
-                key="quiz_radio",
-                index=None,
-            )
-            if st.button("제출", key="quiz_submit"):
-                correct_idx  = quiz["answer"]
-                selected_idx = quiz["options"].index(selected_quiz) if selected_quiz else -1
-                if selected_idx == correct_idx:
-                    st.success(f"✅ 정답! {quiz['options'][correct_idx]}")
-                else:
-                    st.error(f"❌ 오답. 정답: {quiz['options'][correct_idx]}")
-                with st.expander("해설 보기"):
-                    st.write(quiz["explanation"])
-        except (json.JSONDecodeError, KeyError):
-            st.write(quiz_q)
-
 # ═══════════════════════════ 메인 화면 ══════════════════════════════════════
 
 # 상단: 제목 + 모드 표시
 sample_label = st.session_state.get("sample_label", "")
-mode_badge   = f" ({sample_label})" if sample_label else " (실계정)"
-st.title(f"📊 TradeCoach 대시보드{mode_badge}")
+mode_label   = sample_label if sample_label else "실계정"
+render_dashboard_header(mode_label)
+
+win_rate_raw     = stats.get("win_rate", 0)
+avg_return       = stats.get("avg_return_rate", 0)
+stop_consistency = stats.get("loss_consistency", 0)
+render_kpi_cards(win_rate_raw * 100, avg_return, total_pnl, stop_consistency)
 
 # ── 거래내역 테이블 ──────────────────────────────────────────────────────────
 st.subheader("📋 거래내역")
 
 if trade_pairs:
-    rows = []
+    trade_list = []
     for tid, buy, sell in trade_pairs:
         pnl         = float(sell.get("closedPnl", 0) or 0)
         entry_price = float(buy.get("execPrice", 0) or 0)
         exit_price  = float(sell.get("execPrice", 0) or 0)
-        qty         = float(buy.get("orderQty", 0) or 0)
-        exec_value  = float(sell.get("execValue", 0) or buy.get("execValue", 0) or 0)
-        ret_pct     = round(pnl / exec_value * 100, 2) if exec_value else 0.0
         direction   = buy.get("direction", "Long" if buy.get("side", "Buy") == "Buy" else "Short")
-        rows.append({
-            "거래번호":      tid,
-            "종목":          buy.get("symbol", ""),
-            "방향":          "↗️ Long" if direction == "Long" else "↘️ Short",
-            "진입가":        entry_price,
-            "청산가":        exit_price,
-            "수량":          qty,
-            "결과":          "✅ WIN" if pnl >= 0 else "❌ LOSS",
-            "실현손익($)":   f"+${pnl:.2f}" if pnl >= 0 else f"-${abs(pnl):.2f}",
-            "수익률(%)":     ret_pct,
-            "진입시각(KST)": _ms_to_kst(buy.get("execTime", 0)),
-            "청산시각(KST)": _ms_to_kst(sell.get("execTime", 0)),
+        trade_list.append({
+            "id":          tid,
+            "symbol":      buy.get("symbol", ""),
+            "side":        "↗️ Long" if direction == "Long" else "↘️ Short",
+            "entry_price": f"{entry_price:.4f}",
+            "exit_price":  f"{exit_price:.4f}",
+            "result":      "WIN" if pnl >= 0 else "LOSS",
+            "pnl":         pnl,
+            "entry_time":  _ms_to_kst(buy.get("execTime", 0)),
         })
-    st.dataframe(
-        pd.DataFrame(rows),
-        use_container_width=True,
-        column_config={
-            "진입가":   st.column_config.NumberColumn(format="%.4f"),
-            "청산가":   st.column_config.NumberColumn(format="%.4f"),
-            "수량":     st.column_config.NumberColumn(format="%.4f"),
-            "수익률(%)": st.column_config.NumberColumn(format="%.2f%%"),
-        },
-    )
+    render_trade_table(trade_list)
 elif raw_trades:
     df_trades = pd.DataFrame(raw_trades)
     display_cols = [c for c in ["execTime", "symbol", "side", "execPrice", "orderQty", "closedPnl"]
@@ -254,7 +211,7 @@ else:
 
 # ── 복기 뷰어 ────────────────────────────────────────────────────────────────
 st.divider()
-st.subheader("🔍 복기 뷰어")
+render_section_header("복기 뷰어", "트레이드 선택 후 복기 시작")
 
 if not trade_pairs:
     st.caption("복기할 트레이드 쌍이 없습니다. (raw_trades에 Buy/Sell 쌍 필요)")
@@ -429,10 +386,11 @@ else:
         # ── A+ 채점 결과 ──
         aplus_result = st.session_state.get(cache_key_aplus)
         if aplus_result:
+            render_section_header("A+ 채점", "ICT 기준 5가지 진입 품질 평가")
             score = aplus_result["aplus_score"]
             score_color = "#2E7D32" if score >= 4 else "#E65100" if score >= 2 else "#C62828"
             st.markdown(
-                f'<h3 style="color:{score_color}">A+ 점수: {score}/5</h3>',
+                f'<div style="font-size:24px; font-weight:700; color:{score_color}; margin-bottom:12px;">{score}/5</div>',
                 unsafe_allow_html=True,
             )
             bd = aplus_result["aplus_breakdown"]
@@ -452,7 +410,7 @@ else:
             st.markdown(desc_html, unsafe_allow_html=True)
 
         # ── ICT 복기 분석 ──
-        st.markdown("#### 🔍 ICT 복기 분석")
+        render_section_header("ICT 복기 분석", "진입 근거 추론 + 코칭")
         if aplus_result:
             st.info(f"**진입 근거:** {aplus_result['entry_reason']}")
             st.warning(f"**코칭:** {aplus_result['coaching']}")
