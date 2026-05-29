@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from utils.llm_factory import get_llm
+from nodes.stop_loss_node import analyze_stop_loss
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,26 @@ def score_aplus(
         bd["stop_discipline"] = True
     if bd["stop_discipline"]:
         s += 1
+
+    # 손절 위치 (stop_price 입력 시 구조적 판단, 점수 미반영)
+    stop_price = float(trade.get("stop_price", 0))
+    direction = trade.get("direction", "Long" if side == "Buy" else "Short")
+    if stop_price > 0:
+        stop_result = analyze_stop_loss(
+            stop_price=stop_price,
+            entry_price=price,
+            exit_price=float(trade.get("exitPrice", 0)),
+            side=direction,
+            fvg_zones=fvg,
+            ob_zones=ob,
+        )
+        bd["stop_position"]  = stop_result["stop_outside_structure"]
+        bd["rr"]             = stop_result["rr"]
+        bd["stop_assessment"] = stop_result["stop_assessment"]
+    else:
+        bd["stop_position"]  = False
+        bd["rr"]             = 0.0
+        bd["stop_assessment"] = "손절가 미입력"
 
     return {"score": s, "breakdown": bd}
 

@@ -236,8 +236,7 @@ else:
     entry_ms = int(buy_t.get("execTime",  0))
     exit_ms  = int(sell_t.get("execTime", 0))
     order_id = buy_t.get("orderId", "")
-    cache_key       = f"replay_{order_id or str(entry_ms)}"
-    cache_key_aplus = f"aplus_{order_id}"
+    cache_key = f"replay_{order_id or str(entry_ms)}"
 
     if st.button("▶ 복기 시작", type="primary", key="btn_replay_start"):
         st.session_state["replay_open"] = True
@@ -248,27 +247,6 @@ else:
                     order_id=order_id,
                     sample_mode=st.session_state.get("sample_mode", ""),
                 )
-        if cache_key_aplus not in st.session_state:
-            _c    = st.session_state[cache_key]
-            _fvgs = detect_fvg(_c)
-            _obs  = detect_ob(_c)
-            _tl   = detect_trendline(_c)
-            with st.spinner("A+ 채점 중..."):
-                try:
-                    st.session_state[cache_key_aplus] = entry_reason_node(
-                        candles=_c,
-                        ict_patterns={"fvg_zones": _fvgs, "ob_zones": _obs, "trend_info": _tl},
-                        trade={
-                            "symbol":    symbol,
-                            "side":      buy_t.get("side", ""),
-                            "execPrice": buy_t.get("execPrice", 0),
-                            "execTime":  buy_t.get("execTime",  0),
-                            "closedPnl": sell_t.get("closedPnl", 0),
-                        },
-                        session_id=session_id,
-                    )
-                except Exception:
-                    st.session_state[cache_key_aplus] = None
 
     if st.session_state.get("replay_open"):
         if cache_key not in st.session_state:
@@ -282,6 +260,63 @@ else:
         fvgs    = detect_fvg(candles)
         obs     = detect_ob(candles)
         tl      = detect_trendline(candles)
+
+        # ── 손절가 입력 ──
+        st.divider()
+        st.markdown("#### ✂️ 손절가 입력")
+        _direction = buy_t.get("direction", "Long" if buy_t.get("side") == "Buy" else "Short")
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            stop_price = st.number_input(
+                "손절가 (Stop Loss Price)",
+                min_value=0.0,
+                value=0.0,
+                step=0.01,
+                key=f"stop_{order_id}",
+                help="진입 전 설정했던 손절가를 입력하세요.",
+            )
+        with col2:
+            if stop_price > 0:
+                _entry  = float(buy_t.get("execPrice", 0))
+                _exit_p = float(sell_t.get("execPrice", 0))
+                if _direction == "Long":
+                    _risk   = _entry - stop_price
+                    _reward = _exit_p - _entry
+                else:
+                    _risk   = stop_price - _entry
+                    _reward = _entry - _exit_p
+                _rr = round(_reward / _risk, 2) if _risk > 0 else 0.0
+                _color = "#2E7D32" if _rr >= 2 else "#E65100" if _rr >= 1 else "#C62828"
+                st.markdown(
+                    f'<div style="background:#1E2A3A;border-radius:8px;padding:10px 14px;text-align:center">'
+                    f'<div style="font-size:11px;color:#85B7EB">손익비 (RR)</div>'
+                    f'<div style="font-size:24px;font-weight:700;color:{_color}">'
+                    f'{_rr:.2f}</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+        # ── A+ 채점 (stop_price 포함, 변경 시 재실행) ──
+        cache_key_aplus = f"aplus_{order_id}_{stop_price}"
+        if cache_key_aplus not in st.session_state:
+            with st.spinner("A+ 채점 중..."):
+                try:
+                    st.session_state[cache_key_aplus] = entry_reason_node(
+                        candles=candles,
+                        ict_patterns={"fvg_zones": fvgs, "ob_zones": obs, "trend_info": tl},
+                        trade={
+                            "symbol":    symbol,
+                            "side":      buy_t.get("side", ""),
+                            "direction": _direction,
+                            "execPrice": buy_t.get("execPrice", 0),
+                            "exitPrice": sell_t.get("execPrice", 0),
+                            "execTime":  buy_t.get("execTime", 0),
+                            "closedPnl": sell_t.get("closedPnl", 0),
+                            "stop_price": stop_price,
+                        },
+                        session_id=session_id,
+                    )
+                except Exception:
+                    st.session_state[cache_key_aplus] = None
 
         # ── 캔들차트 + ICT 오버레이 ──
         df_c = pd.DataFrame(candles)
@@ -406,6 +441,11 @@ else:
             for _k, (_label, _desc) in CRITERIA_DESC.items():
                 icon = "✅" if bd.get(_k) else "❌"
                 desc_html += f"{icon} <b>{_label}</b>: {_desc}<br>"
+            _stop_assessment = bd.get("stop_assessment", "")
+            if _stop_assessment and _stop_assessment != "손절가 미입력":
+                _stop_icon = "✅" if bd.get("stop_position") else "❌"
+                _rr_disp   = f" | RR {bd['rr']:.2f}" if bd.get("rr", 0) > 0 else ""
+                desc_html += f"{_stop_icon} <b>손절 위치</b>: {_stop_assessment}{_rr_disp}<br>"
             desc_html += "</div>"
             st.markdown(desc_html, unsafe_allow_html=True)
 
