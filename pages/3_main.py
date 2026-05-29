@@ -132,37 +132,32 @@ with st.sidebar.expander("📊 대시보드", expanded=True):
     if action_rule:
         st.success(f"★ {action_rule}")
 
-    st.divider()
-    st.markdown("**📋 트레이딩 철학**")
-    PHILOSOPHY = [
-        "하루 3번 이상 손절 시 당일 거래 중단",
-        "매 거래 최대 손실금액 사전 고정",
-        "Revenge Trading 절대 금지",
-        "No Setup = No Trade",
-        "손절선은 진입 전에 결정",
-    ]
-    for rule in PHILOSOPHY:
-        st.markdown(f"✅ {rule}")
-
-    st.divider()
-
-    st.markdown("**📐 ICT 핵심 원칙**")
-    ICT_RULES = [
-        ("🕐", "킬존 진입",  "런던 02-05 UTC / 뉴욕 07-10 UTC"),
-        ("📊", "구조적 진입", "FVG 또는 OB 구간 내 진입"),
-        ("📈", "추세 정렬",  "상위 추세 방향으로만 진입"),
-        ("🛡️", "손절 위치",  "구조적 레벨(FVG/OB 하단) 바깥"),
-    ]
-    for icon, title, desc in ICT_RULES:
-        st.markdown(f"{icon} **{title}**: {desc}")
-
     judge_result = res.get("judge_result", "")
     judge_passed = res.get("judge_passed", True)
-    if judge_result:
-        if judge_passed:
-            st.success(f"✅ {judge_result}")
-        else:
-            st.warning(f"⚠️ 보완 필요: {judge_result}")
+    if judge_result and judge_passed:
+        st.success(f"✅ {judge_result}")
+
+    with st.expander("📋 트레이딩 철학 & ICT 원칙", expanded=False):
+        PHILOSOPHY = [
+            "하루 3번 이상 손절 시 당일 거래 중단",
+            "매 거래 최대 손실금액 사전 고정",
+            "Revenge Trading 절대 금지",
+            "No Setup = No Trade",
+            "손절선은 진입 전에 결정",
+        ]
+        for rule in PHILOSOPHY:
+            st.markdown(f"✅ {rule}")
+
+        st.divider()
+
+        ICT_RULES = [
+            ("🕐", "킬존 진입",  "런던 02-05 UTC / 뉴욕 07-10 UTC"),
+            ("📊", "구조적 진입", "FVG 또는 OB 구간 내 진입"),
+            ("📈", "추세 정렬",  "상위 추세 방향으로만 진입"),
+            ("🛡️", "손절 위치",  "구조적 레벨(FVG/OB 하단) 바깥"),
+        ]
+        for icon, title, desc in ICT_RULES:
+            st.markdown(f"{icon} **{title}**: {desc}")
 
 # ═══════════════════════════ 메인 화면 ══════════════════════════════════════
 
@@ -238,7 +233,7 @@ else:
     order_id = buy_t.get("orderId", "")
     cache_key = f"replay_{order_id or str(entry_ms)}"
 
-    if st.button("▶ 복기 시작", type="primary", key="btn_replay_start"):
+    if st.button("▶ 복기 시작", key="btn_replay_start"):
         st.session_state["replay_open"] = True
         if cache_key not in st.session_state:
             with st.spinner("캔들 데이터 수집 중..."):
@@ -410,8 +405,13 @@ else:
                 name="청산",
             ))
 
+        exec_date_kst = (
+            pd.to_datetime(entry_ms, unit="ms", utc=True)
+            .tz_convert("Asia/Seoul")
+            .strftime("%Y-%m-%d")
+        )
         fig.update_layout(
-            title=f"{symbol} 복기 차트 (FVG/OB/추세선 오버레이)",
+            title=f"{symbol} 거래 복기 — {exec_date_kst}",
             xaxis_rangeslider_visible=False,
             height=520,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -479,37 +479,47 @@ else:
         save_trade_tag(session_id, order_id, symbol, auto_setup, user_confirmed=0)
         st.session_state["trade_tags"][order_id] = {"tag": auto_setup, "confirmed": 0}
 
-        col_fvg, col_ob, col_tl = st.columns(3)
-        with col_fvg:
-            if fvgs:
-                st.markdown(f"**FVG: {len(fvgs)}개**")
-                for fvg in fvgs:
-                    fvg_time = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True).strftime("%m-%d %H:%M")
-                    tag = "📈 Bull" if fvg["type"] == "bullish" else "📉 Bear"
-                    st.caption(f"{tag} | {fvg_time} | {fvg['bottom']:.1f}~{fvg['top']:.1f}")
-            else:
-                st.info("FVG 없음")
+        _col1, _col2, _col3 = st.columns(3)
+        with _col1:
+            st.metric("FVG", f"{len(fvgs)}개")
+        with _col2:
+            st.metric("OB", f"{len(obs)}개")
+        with _col3:
+            _channel = tl.get("channel_type", "불명확") if tl else "불명확"
+            st.metric("추세", _channel)
 
-        with col_ob:
-            if obs:
-                st.markdown(f"**OB: {len(obs)}개**")
-                for ob in obs:
-                    ob_time = pd.to_datetime(ob["timestamp"], unit="ms", utc=True).strftime("%m-%d %H:%M")
-                    tag = "🟢 Bull" if ob["type"] == "bullish" else "🔴 Bear"
-                    st.caption(f"{tag} | {ob_time} | {ob['bottom']:.1f}~{ob['top']:.1f}")
-            else:
-                st.info("OB 없음")
+        with st.expander("ICT 패턴 상세 보기", expanded=False):
+            col_fvg, col_ob, col_tl = st.columns(3)
+            with col_fvg:
+                if fvgs:
+                    st.markdown(f"**FVG: {len(fvgs)}개**")
+                    for fvg in fvgs:
+                        fvg_time = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True).strftime("%m-%d %H:%M")
+                        tag = "📈 Bull" if fvg["type"] == "bullish" else "📉 Bear"
+                        st.caption(f"{tag} | {fvg_time} | {fvg['bottom']:.1f}~{fvg['top']:.1f}")
+                else:
+                    st.info("FVG 없음")
 
-        with col_tl:
-            if tl and (tl.get("resistance") or tl.get("support")):
-                channel_label = f" ({tl['channel_type']} 채널)" if tl.get("is_channel") else ""
-                st.markdown(f"**추세선{channel_label}**")
-                if tl.get("resistance"):
-                    st.caption(f"저항선 기울기: {tl['resistance']['slope']:.2f}")
-                if tl.get("support"):
-                    st.caption(f"지지선 기울기: {tl['support']['slope']:.2f}")
-            else:
-                st.info("추세선 없음")
+            with col_ob:
+                if obs:
+                    st.markdown(f"**OB: {len(obs)}개**")
+                    for ob in obs:
+                        ob_time = pd.to_datetime(ob["timestamp"], unit="ms", utc=True).strftime("%m-%d %H:%M")
+                        tag = "🟢 Bull" if ob["type"] == "bullish" else "🔴 Bear"
+                        st.caption(f"{tag} | {ob_time} | {ob['bottom']:.1f}~{ob['top']:.1f}")
+                else:
+                    st.info("OB 없음")
+
+            with col_tl:
+                if tl and (tl.get("resistance") or tl.get("support")):
+                    channel_label = f" ({tl['channel_type']} 채널)" if tl.get("is_channel") else ""
+                    st.markdown(f"**추세선{channel_label}**")
+                    if tl.get("resistance"):
+                        st.caption(f"저항선 기울기: {tl['resistance']['slope']:.2f}")
+                    if tl.get("support"):
+                        st.caption(f"지지선 기울기: {tl['support']['slope']:.2f}")
+                else:
+                    st.info("추세선 없음")
 
         journal_entries = st.session_state.get("last_journal_entries", [])
         matching = [e for e in journal_entries if e.get("symbol") == symbol]
