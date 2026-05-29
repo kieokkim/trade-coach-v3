@@ -46,6 +46,37 @@ def _has_consecutive_loss(journal: list, n: int = 3) -> bool:
     return False
 
 
+def _has_early_exit(journal_entries: list) -> bool:
+    """
+    수익 거래(win)의 홀딩 시간이 손실 거래(loss)보다
+    현저히 짧으면 조기 청산 패턴으로 판단.
+
+    홀딩 시간 = execTime(진입) ~ exitTime(청산) 간격 (분)
+    조건: win 평균 홀딩 < loss 평균 홀딩 * 0.5
+    최소 win 3건 이상일 때만 판단.
+    """
+    wins   = [e for e in journal_entries if e.get("result") == "win"]
+    losses = [e for e in journal_entries if e.get("result") == "loss"]
+
+    if len(wins) < 3 or len(losses) < 1:
+        return False
+
+    def avg_holding(entries):
+        times = []
+        for e in entries:
+            exec_ms = int(e.get("execTime", 0))
+            exit_ms = int(e.get("exitTime", exec_ms))
+            holding = (exit_ms - exec_ms) / 1000 / 60
+            if holding > 0:
+                times.append(holding)
+        return sum(times) / len(times) if times else 0
+
+    win_avg  = avg_holding(wins)
+    loss_avg = avg_holding(losses)
+
+    return win_avg > 0 and loss_avg > 0 and win_avg < loss_avg * 0.5
+
+
 ICT_WEAKNESS_RULES = [
     # (태그명, 조건 함수, 설명)
     ("과매매_감지",
@@ -80,6 +111,10 @@ ICT_WEAKNESS_RULES = [
     ("연속손실_패턴",
      lambda s, j: _has_consecutive_loss(j, n=3),
      "3회 이상 연속 손절"),
+
+    ("조기청산_패턴",
+     lambda s, j: _has_early_exit(j),
+     "수익 거래에서 평균보다 짧게 홀딩 후 청산"),
 ]
 
 

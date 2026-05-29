@@ -34,10 +34,32 @@ def journal_write_node(state: dict) -> dict:
     session_id = state.get("session_id", "default")
     logger.info("journal_write_node start | session_id=%s", session_id)
 
-    closed = [t for t in state.get("raw_trades", [])
-              if t.get("closedPnl", "0") != "0"]
+    raw_trades  = state.get("raw_trades", [])
+    buy_trades  = [t for t in raw_trades if str(t.get("side", "")).lower() == "buy"]
+    sell_trades = [t for t in raw_trades
+                   if str(t.get("side", "")).lower() == "sell"
+                   and str(t.get("closedPnl", "0")) != "0"]
 
-    entries = [_format_journal_entry(t) for t in closed]
+    # Buy→Sell 페어링: 같은 symbol 첫 매칭
+    entry_time_map: dict[int, int] = {}
+    used_buys: set[int] = set()
+    for j, sell in enumerate(sell_trades):
+        for i, buy in enumerate(buy_trades):
+            if i in used_buys:
+                continue
+            if buy.get("symbol") == sell.get("symbol"):
+                entry_time_map[j] = int(buy.get("execTime", 0))
+                used_buys.add(i)
+                break
+
+    entries = []
+    for j, sell in enumerate(sell_trades):
+        entry = _format_journal_entry(sell)
+        buy_exec_time = entry_time_map.get(j, 0)
+        if buy_exec_time:
+            entry["exitTime"] = entry["execTime"]   # sell execTime → 청산시각
+            entry["execTime"] = buy_exec_time        # buy execTime  → 진입시각
+        entries.append(entry)
 
     logger.info("journal_write_node end | session_id=%s entries=%d", session_id, len(entries))
     return {"journal_entries": entries}
