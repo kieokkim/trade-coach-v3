@@ -180,7 +180,9 @@ if trade_pairs:
         pnl         = float(sell.get("closedPnl", 0) or 0)
         entry_price = float(buy.get("execPrice", 0) or 0)
         exit_price  = float(sell.get("execPrice", 0) or 0)
-        direction   = buy.get("direction", "Long" if buy.get("side", "Buy") == "Buy" else "Short")
+        _dir_raw  = buy.get("direction")
+        direction = _dir_raw if _dir_raw in ("Long", "Short") else \
+                    ("Long" if buy.get("side", "Buy") == "Buy" else "Short")
         trade_list.append({
             "id":          tid,
             "symbol":      buy.get("symbol", ""),
@@ -259,7 +261,9 @@ else:
         # ── 손절가 입력 ──
         st.divider()
         st.markdown("#### ✂️ 손절가 입력")
-        _direction = buy_t.get("direction", "Long" if buy_t.get("side") == "Buy" else "Short")
+        _dir_raw   = buy_t.get("direction")
+        _direction = _dir_raw if _dir_raw in ("Long", "Short") else \
+                     ("Long" if buy_t.get("side", "Buy") == "Buy" else "Short")
         col1, col2 = st.columns([2, 1])
         with col1:
             stop_price = st.number_input(
