@@ -349,9 +349,16 @@ else:
                 actual_qty=_actual_qty,
             )
 
-        # ── A+ 채점 (stop_price 포함, 변경 시 재실행) ──
-        cache_key_aplus = f"aplus_{order_id}_{stop_price}"
-        if cache_key_aplus not in st.session_state:
+        # ── A+ 채점 (수동 실행) ──
+        cache_key_aplus = f"aplus_{order_id}_{stop_price}_{fixed_loss}"
+        st.divider()
+        if stop_price > 0:
+            st.caption("✅ 손절가 입력됨 — A+ 채점을 시작할 수 있습니다")
+        else:
+            st.caption("⚠️ 손절가를 입력하면 더 정확한 채점이 가능합니다")
+
+        if st.button("🏆 A+ 채점 시작", key=f"btn_aplus_{order_id}",
+                     help="손절가와 고정 손실 금액 입력 후 채점하세요"):
             with st.spinner("A+ 채점 중..."):
                 try:
                     st.session_state[cache_key_aplus] = entry_reason_node(
