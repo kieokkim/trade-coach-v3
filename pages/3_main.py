@@ -290,6 +290,61 @@ else:
                     unsafe_allow_html=True,
                 )
 
+        # ── 포지션 사이징 ──
+        st.markdown("#### 💰 포지션 사이징")
+        _ps_col1, _ps_col2, _ps_col3 = st.columns(3)
+        with _ps_col1:
+            fixed_loss = st.number_input(
+                "고정 손실 금액 ($)",
+                min_value=0.0,
+                value=0.0,
+                step=1.0,
+                key=f"fixed_loss_{order_id}",
+                help="이 거래에서 허용할 최대 손실 금액",
+            )
+
+        _entry_p    = float(buy_t.get("execPrice", 0))
+        _actual_qty = float(buy_t.get("orderQty", 0))
+        if stop_price > 0 and fixed_loss > 0:
+            _risk_per_unit = abs(_entry_p - stop_price)
+            _ideal_qty = round(fixed_loss / _risk_per_unit, 4) if _risk_per_unit > 0 else 0.0
+        else:
+            _ideal_qty = 0.0
+
+        with _ps_col2:
+            if _ideal_qty > 0:
+                st.metric("적정 진입 수량", f"{_ideal_qty}")
+            else:
+                st.metric("적정 진입 수량", "—")
+
+        with _ps_col3:
+            if stop_price > 0 and fixed_loss > 0 and _ideal_qty > 0:
+                _ratio = round(_actual_qty / _ideal_qty, 1)
+                _ps_color = "#2E7D32" if _ratio <= 1.2 else "#E65100" if _ratio <= 2.0 else "#C62828"
+                _ps_label = "적정" if _ratio <= 1.2 else "과다" if _ratio <= 2.0 else "위험"
+                st.markdown(
+                    f'<div style="text-align:center;padding:12px;'
+                    f'background:#1E2A3A;border-radius:8px">'
+                    f'<div style="font-size:11px;color:#85B7EB">실제/적정 비율</div>'
+                    f'<div style="font-size:20px;font-weight:700;color:{_ps_color}">'
+                    f'{_ratio}x {_ps_label}</div></div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.metric("실제/적정 비율", "—")
+
+        if fixed_loss > 0 and _ideal_qty > 0:
+            save_trade_tag(
+                session_id=session_id,
+                order_id=order_id,
+                symbol=symbol,
+                ict_tag=st.session_state.get(f"user_tag_{order_id}", "확인필요"),
+                user_confirmed=0,
+                fixed_loss=fixed_loss,
+                ideal_qty=_ideal_qty,
+                actual_qty=_actual_qty,
+            )
+
         # ── A+ 채점 (stop_price 포함, 변경 시 재실행) ──
         cache_key_aplus = f"aplus_{order_id}_{stop_price}"
         if cache_key_aplus not in st.session_state:

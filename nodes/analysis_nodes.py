@@ -77,6 +77,16 @@ def _has_early_exit(journal_entries: list) -> bool:
     return win_avg > 0 and loss_avg > 0 and win_avg < loss_avg * 0.5
 
 
+def _has_oversized_position(journal_entries: list) -> bool:
+    """ideal_qty 대비 actual_qty가 2배 이상인 거래 존재 시 True."""
+    for e in journal_entries:
+        ideal  = float(e.get("ideal_qty", 0))
+        actual = float(e.get("actual_qty", 0))
+        if ideal > 0 and actual / ideal >= 2.0:
+            return True
+    return False
+
+
 ICT_WEAKNESS_RULES = [
     # (태그명, 조건 함수, 설명)
     ("과매매_감지",
@@ -115,6 +125,10 @@ ICT_WEAKNESS_RULES = [
     ("조기청산_패턴",
      lambda s, j: _has_early_exit(j),
      "수익 거래에서 평균보다 짧게 홀딩 후 청산"),
+
+    ("포지션_과다",
+     lambda s, j: _has_oversized_position(j),
+     "적정 수량 대비 실제 수량이 2배 이상인 거래 존재"),
 ]
 
 

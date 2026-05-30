@@ -106,6 +106,17 @@ def init_db() -> None:
         except Exception:
             pass
 
+        # trade_tags 포지션 사이징 컬럼
+        for col_ddl in [
+            "ALTER TABLE trade_tags ADD COLUMN fixed_loss FLOAT DEFAULT 0.0",
+            "ALTER TABLE trade_tags ADD COLUMN ideal_qty  FLOAT DEFAULT 0.0",
+            "ALTER TABLE trade_tags ADD COLUMN actual_qty FLOAT DEFAULT 0.0",
+        ]:
+            try:
+                conn.execute(col_ddl)
+            except Exception:
+                pass
+
         # trade_tags 테이블
         conn.execute("""
             CREATE TABLE IF NOT EXISTS trade_tags (
@@ -127,18 +138,25 @@ def save_trade_tag(
     symbol: str,
     ict_tag: str,
     user_confirmed: int = 0,
+    fixed_loss: float = 0.0,
+    ideal_qty: float = 0.0,
+    actual_qty: float = 0.0,
 ) -> None:
     with get_db() as conn:
         conn.execute(
             """
-            INSERT INTO trade_tags (session_id, order_id, symbol, ict_tag, user_confirmed, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO trade_tags (session_id, order_id, symbol, ict_tag, user_confirmed,
+                                    fixed_loss, ideal_qty, actual_qty, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(session_id, order_id) DO UPDATE SET
                 ict_tag=excluded.ict_tag,
-                user_confirmed=excluded.user_confirmed
+                user_confirmed=excluded.user_confirmed,
+                fixed_loss=CASE WHEN excluded.fixed_loss > 0 THEN excluded.fixed_loss ELSE trade_tags.fixed_loss END,
+                ideal_qty=CASE WHEN excluded.ideal_qty  > 0 THEN excluded.ideal_qty  ELSE trade_tags.ideal_qty  END,
+                actual_qty=CASE WHEN excluded.actual_qty > 0 THEN excluded.actual_qty ELSE trade_tags.actual_qty END
             """,
             (session_id, order_id, symbol, ict_tag, user_confirmed,
-             datetime.utcnow().isoformat()),
+             fixed_loss, ideal_qty, actual_qty, datetime.utcnow().isoformat()),
         )
 
 
