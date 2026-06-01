@@ -2,6 +2,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 # ── 유틸 함수 ────────────────────────────────────────────────────────────────
 
@@ -271,16 +272,32 @@ else:
         _direction = _dir_raw if _dir_raw in ("Long", "Short") else \
                      ("Long" if buy_t.get("side", "Buy") == "Buy" else "Short")
         _entry_display = f"{float(buy_t.get('execPrice', 0)):,.2f}"
+        _saved_stop = float(
+            st.session_state["trade_tags"].get(order_id, {}).get("stop_price", 0.0) or 0.0
+        )
         col1, col2 = st.columns([2, 1])
         with col1:
             stop_price = st.number_input(
                 f"손절가 USDT  (진입가: {_entry_display} USDT)",
                 min_value=0.0,
-                value=0.0,
+                value=_saved_stop,
                 step=0.01,
                 key=f"stop_{order_id}",
                 help="진입 전 설정했던 손절가를 USDT 기준으로 입력하세요.",
             )
+        if stop_price > 0 and stop_price != _saved_stop:
+            save_trade_tag(
+                session_id=session_id,
+                order_id=order_id,
+                symbol=symbol,
+                ict_tag=st.session_state["trade_tags"].get(order_id, {}).get("tag", "확인필요"),
+                user_confirmed=0,
+                stop_price=stop_price,
+            )
+            st.session_state["trade_tags"][order_id] = {
+                **st.session_state["trade_tags"].get(order_id, {}),
+                "stop_price": stop_price,
+            }
         with col2:
             if stop_price > 0:
                 _entry  = float(buy_t.get("execPrice", 0))
@@ -393,7 +410,10 @@ else:
 
         # ── 캔들차트 + ICT 오버레이 ──
         df_c = pd.DataFrame(candles)
-        df_c["dt"] = pd.to_datetime(df_c["timestamp"], unit="ms", utc=True)
+        df_c["dt"] = (
+            pd.to_datetime(df_c["timestamp"], unit="ms", utc=True)
+            .dt.tz_convert("Asia/Seoul")
+        )
 
         fig = go.Figure(data=[go.Candlestick(
             x=df_c["dt"],
@@ -407,7 +427,7 @@ else:
         )])
 
         for fvg in fvgs:
-            fvg_dt = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True)
+            fvg_dt = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True).tz_convert("Asia/Seoul")
             color  = "rgba(255,200,0,0.2)" if fvg["type"] == "bullish" else "rgba(255,80,80,0.15)"
             fig.add_shape(
                 type="rect",
@@ -417,7 +437,7 @@ else:
             )
 
         for ob in obs:
-            ob_dt  = pd.to_datetime(ob["timestamp"], unit="ms", utc=True)
+            ob_dt  = pd.to_datetime(ob["timestamp"], unit="ms", utc=True).tz_convert("Asia/Seoul")
             ob_clr = "rgba(0,200,100,0.15)" if ob["type"] == "bullish" else "rgba(200,50,50,0.15)"
             fig.add_shape(
                 type="rect",
@@ -466,8 +486,9 @@ else:
                     line=dict(width=0), showlegend=False, hoverinfo="skip",
                 ))
 
-        entry_dt  = datetime.fromtimestamp(entry_ms / 1000, tz=timezone.utc)
-        exit_dt   = datetime.fromtimestamp(exit_ms  / 1000, tz=timezone.utc)
+        _KST      = ZoneInfo("Asia/Seoul")
+        entry_dt  = datetime.fromtimestamp(entry_ms / 1000, tz=_KST)
+        exit_dt   = datetime.fromtimestamp(exit_ms  / 1000, tz=_KST)
         entry_row = df_c[df_c["timestamp"] <= entry_ms].tail(1)
         exit_row  = df_c[df_c["timestamp"] <= exit_ms].tail(1)
         _entry_price_marker = float(buy_t.get("execPrice", 0))

@@ -108,9 +108,10 @@ def init_db() -> None:
 
         # trade_tags 포지션 사이징 컬럼
         for col_ddl in [
-            "ALTER TABLE trade_tags ADD COLUMN fixed_loss FLOAT DEFAULT 0.0",
-            "ALTER TABLE trade_tags ADD COLUMN ideal_qty  FLOAT DEFAULT 0.0",
-            "ALTER TABLE trade_tags ADD COLUMN actual_qty FLOAT DEFAULT 0.0",
+            "ALTER TABLE trade_tags ADD COLUMN fixed_loss  FLOAT DEFAULT 0.0",
+            "ALTER TABLE trade_tags ADD COLUMN ideal_qty   FLOAT DEFAULT 0.0",
+            "ALTER TABLE trade_tags ADD COLUMN actual_qty  FLOAT DEFAULT 0.0",
+            "ALTER TABLE trade_tags ADD COLUMN stop_price  REAL  DEFAULT 0",
         ]:
             try:
                 conn.execute(col_ddl)
@@ -141,33 +142,39 @@ def save_trade_tag(
     fixed_loss: float = 0.0,
     ideal_qty: float = 0.0,
     actual_qty: float = 0.0,
+    stop_price: float = 0.0,
 ) -> None:
     with get_db() as conn:
         conn.execute(
             """
             INSERT INTO trade_tags (session_id, order_id, symbol, ict_tag, user_confirmed,
-                                    fixed_loss, ideal_qty, actual_qty, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    fixed_loss, ideal_qty, actual_qty, stop_price, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(session_id, order_id) DO UPDATE SET
                 ict_tag=excluded.ict_tag,
                 user_confirmed=excluded.user_confirmed,
-                fixed_loss=CASE WHEN excluded.fixed_loss > 0 THEN excluded.fixed_loss ELSE trade_tags.fixed_loss END,
-                ideal_qty=CASE WHEN excluded.ideal_qty  > 0 THEN excluded.ideal_qty  ELSE trade_tags.ideal_qty  END,
-                actual_qty=CASE WHEN excluded.actual_qty > 0 THEN excluded.actual_qty ELSE trade_tags.actual_qty END
+                fixed_loss=CASE WHEN excluded.fixed_loss   > 0 THEN excluded.fixed_loss   ELSE trade_tags.fixed_loss   END,
+                ideal_qty=CASE WHEN excluded.ideal_qty     > 0 THEN excluded.ideal_qty    ELSE trade_tags.ideal_qty    END,
+                actual_qty=CASE WHEN excluded.actual_qty   > 0 THEN excluded.actual_qty   ELSE trade_tags.actual_qty   END,
+                stop_price=CASE WHEN excluded.stop_price   > 0 THEN excluded.stop_price   ELSE trade_tags.stop_price   END
             """,
             (session_id, order_id, symbol, ict_tag, user_confirmed,
-             fixed_loss, ideal_qty, actual_qty, datetime.utcnow().isoformat()),
+             fixed_loss, ideal_qty, actual_qty, stop_price, datetime.utcnow().isoformat()),
         )
 
 
 def load_trade_tags(session_id: str) -> dict:
-    """orderId → {"tag": str, "confirmed": int} 딕셔너리 반환"""
+    """orderId → {"tag": str, "confirmed": int, "stop_price": float} 딕셔너리 반환"""
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT order_id, ict_tag, user_confirmed FROM trade_tags WHERE session_id=?",
+            "SELECT order_id, ict_tag, user_confirmed, stop_price FROM trade_tags WHERE session_id=?",
             (session_id,),
         ).fetchall()
     return {
-        r["order_id"]: {"tag": r["ict_tag"], "confirmed": r["user_confirmed"]}
+        r["order_id"]: {
+            "tag":        r["ict_tag"],
+            "confirmed":  r["user_confirmed"],
+            "stop_price": float(r["stop_price"] or 0.0),
+        }
         for r in rows
     }
