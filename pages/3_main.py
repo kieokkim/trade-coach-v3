@@ -187,8 +187,8 @@ if trade_pairs:
             "id":          tid,
             "symbol":      buy.get("symbol", ""),
             "side":        "↗️ Long" if direction == "Long" else "↘️ Short",
-            "entry_price": f"{entry_price:.4f}",
-            "exit_price":  f"{exit_price:.4f}",
+            "entry_price": f"{entry_price:,.2f}",
+            "exit_price":  f"{exit_price:,.2f}",
             "result":      "WIN" if pnl >= 0 else "LOSS",
             "pnl":         pnl,
             "entry_time":  _ms_to_kst(buy.get("execTime", 0)),
@@ -264,15 +264,16 @@ else:
         _dir_raw   = buy_t.get("direction")
         _direction = _dir_raw if _dir_raw in ("Long", "Short") else \
                      ("Long" if buy_t.get("side", "Buy") == "Buy" else "Short")
+        _entry_display = f"{float(buy_t.get('execPrice', 0)):,.2f}"
         col1, col2 = st.columns([2, 1])
         with col1:
             stop_price = st.number_input(
-                "손절가 (Stop Loss Price)",
+                f"손절가 USDT  (진입가: {_entry_display} USDT)",
                 min_value=0.0,
                 value=0.0,
                 step=0.01,
                 key=f"stop_{order_id}",
-                help="진입 전 설정했던 손절가를 입력하세요.",
+                help="진입 전 설정했던 손절가를 USDT 기준으로 입력하세요.",
             )
         with col2:
             if stop_price > 0:
