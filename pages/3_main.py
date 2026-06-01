@@ -194,6 +194,7 @@ if trade_pairs:
             "side":        "↗️ Long" if direction == "Long" else "↘️ Short",
             "entry_price": f"{entry_price:,.2f}",
             "exit_price":  f"{exit_price:,.2f}",
+            "qty":         float(buy.get("orderQty", 0)),
             "result":      "WIN" if pnl >= 0 else "LOSS",
             "pnl":         pnl,
             "entry_time":  _ms_to_kst(buy.get("execTime", 0)),
@@ -469,18 +470,30 @@ else:
         exit_dt   = datetime.fromtimestamp(exit_ms  / 1000, tz=timezone.utc)
         entry_row = df_c[df_c["timestamp"] <= entry_ms].tail(1)
         exit_row  = df_c[df_c["timestamp"] <= exit_ms].tail(1)
+        _entry_price_marker = float(buy_t.get("execPrice", 0))
+        _exit_price_marker  = float(sell_t.get("execPrice", 0))
         if not entry_row.empty:
             fig.add_trace(go.Scatter(
-                x=[entry_dt], y=[float(entry_row["low"].iloc[0]) * 0.999],
+                x=[entry_dt], y=[_entry_price_marker],
                 mode="markers", marker=dict(symbol="triangle-up", size=14, color="#1565C0"),
                 name="진입",
             ))
         if not exit_row.empty:
             fig.add_trace(go.Scatter(
-                x=[exit_dt], y=[float(exit_row["high"].iloc[0]) * 1.001],
+                x=[exit_dt], y=[_exit_price_marker],
                 mode="markers", marker=dict(symbol="triangle-down", size=14, color="#C62828"),
                 name="청산",
             ))
+
+        if stop_price > 0:
+            fig.add_hline(
+                y=stop_price,
+                line_dash="dot",
+                line_color="#FF6B6B",
+                line_width=1.5,
+                annotation_text=f"SL {stop_price:,.2f}",
+                annotation_position="right",
+            )
 
         exec_date_kst = (
             pd.to_datetime(entry_ms, unit="ms", utc=True)
