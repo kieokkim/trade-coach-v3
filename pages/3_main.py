@@ -180,6 +180,11 @@ if trade_pairs:
         pnl         = float(sell.get("closedPnl", 0) or 0)
         entry_price = float(buy.get("execPrice", 0) or 0)
         exit_price  = float(sell.get("execPrice", 0) or 0)
+        if exit_price == entry_price:
+            _pnl_fb  = float(sell.get("closedPnl", 0) or 0)
+            _qty_fb  = float(buy.get("orderQty", 1) or 1)
+            if _qty_fb > 0:
+                exit_price = entry_price + _pnl_fb / _qty_fb
         _dir_raw  = buy.get("direction")
         direction = _dir_raw if _dir_raw in ("Long", "Short") else \
                     ("Long" if buy.get("side", "Buy") == "Buy" else "Short")
@@ -279,6 +284,11 @@ else:
             if stop_price > 0:
                 _entry  = float(buy_t.get("execPrice", 0))
                 _exit_p = float(sell_t.get("execPrice", 0))
+                if _exit_p == _entry:
+                    _pnl_fb = float(sell_t.get("closedPnl", 0) or 0)
+                    _qty_fb = float(buy_t.get("orderQty", 1) or 1)
+                    if _qty_fb > 0:
+                        _exit_p = _entry + _pnl_fb / _qty_fb
                 if _direction == "Long":
                     _risk   = _entry - stop_price
                     _reward = _exit_p - _entry
