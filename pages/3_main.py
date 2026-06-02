@@ -110,20 +110,6 @@ if "default_fixed_loss" not in st.session_state:
     st.session_state["default_fixed_loss"] = _default_loss_saved
 
 with st.sidebar.expander("📊 대시보드", expanded=True):
-    st.markdown("**💰 기본 고정 손실 금액**")
-    _new_default = st.number_input(
-        "거래당 최대 손실 ($)",
-        min_value=0.0,
-        value=st.session_state["default_fixed_loss"],
-        step=1.0,
-        key="sidebar_default_loss",
-        help="모든 거래의 포지션 사이징 기본값. 거래별로 개별 조정 가능.",
-    )
-    if _new_default != st.session_state["default_fixed_loss"]:
-        save_setting("default_fixed_loss", str(_new_default))
-        st.session_state["default_fixed_loss"] = _new_default
-    st.divider()
-
     kpi_desc_html = """
 <div style="background:#1E2A3A;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:11px;line-height:1.8;color:#A8B8C8">
 <b style="color:#7EB8D4">📐 지표 설명</b><br>
@@ -230,6 +216,35 @@ elif raw_trades:
     st.dataframe(df_display, use_container_width=True)
 else:
     st.caption("거래내역 없음")
+
+# ── 포지션 사이징 기본값 설정 ─────────────────────────────────────────────────
+st.divider()
+with st.expander("💰 포지션 사이징 기본값 설정", expanded=False):
+    st.caption("모든 거래에 적용되는 기본 고정 손실 금액. 복기 뷰어에서 거래별로 개별 조정 가능.")
+    _gc1, _gc2 = st.columns([2, 1])
+    with _gc1:
+        _new_default = st.number_input(
+            "거래당 최대 손실 ($)",
+            min_value=0.0,
+            value=st.session_state["default_fixed_loss"],
+            step=1.0,
+            key="global_default_loss",
+            help="모든 거래의 포지션 사이징 초기값",
+        )
+    with _gc2:
+        if _new_default > 0:
+            st.markdown(
+                f'<div style="background:#1E2A3A;border-radius:8px;'
+                f'padding:10px;text-align:center;margin-top:24px">'
+                f'<div style="font-size:11px;color:#85B7EB">기본 손실 한도</div>'
+                f'<div style="font-size:20px;font-weight:700;color:#26a69a">'
+                f'${_new_default:.0f}</div></div>',
+                unsafe_allow_html=True,
+            )
+    if _new_default != st.session_state["default_fixed_loss"]:
+        save_setting("default_fixed_loss", str(_new_default))
+        st.session_state["default_fixed_loss"] = _new_default
+        st.success("✅ 기본값 저장됨")
 
 # ── 복기 뷰어 ────────────────────────────────────────────────────────────────
 st.divider()
