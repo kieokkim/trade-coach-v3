@@ -1,6 +1,6 @@
 # TradeCoach — Future Roadmap
 
-> 현재 레포(`trade-coach-v3`)는 v2.2 이후 개발 목적입니다.
+> 현재 레포(`trade-coach-v3`)는 v2.3 이후 개발 목적입니다.
 > ⚠️ 표현 주의: "Replay"는 v2.3 이후 단계입니다. v2.1은 "거래 복기 뷰어"입니다.
 
 ---
@@ -18,7 +18,7 @@ v2.0 안정성을 유지하면서 새 기능을 개발하기 위해 별도 레�
 
 ---
 
-## 사용자 시나리오 (v2.2 기준)
+## 사용자 시나리오 (v2.3 기준)
 
 ```
 1. 시작 페이지: Bybit API 키 입력 또는 샘플 모드 선택 (초보/중급/고수)
@@ -97,25 +97,49 @@ ict/mss.py             # MSS / BOS
 
 ---
 
-### v2.3 — Replay Coach (candle-by-candle 복기) 🔜
+### v2.3 — Replay Coach ✅ 완료
 **브랜치:** `feature/replay-coach`
 
 > 이 단계부터 "Replay"라는 표현 사용 적절
 
-- 캔들 단계적 표시 (bar-by-bar)
-- "왜 MSS 확인 전에 진입했나요?" 질문 플로우
-- AI 복기 피드백
+완료 기능:
+- 손절가/RR 입력 + DB 영구 저장
+- 포지션 사이징 (기본값 + 거래별 override)
+- 조기 청산 패턴 탐지 (win 홀딩 < loss 홀딩 × 0.5)
+- execPrice 캔들 범위 검증 + 슬리피지 경고
+- 샘플 데이터 실제 시장가 기반 재생성 (Bybit Kline API)
+- 퀴즈 제거 — 복기 코치 본질 집중
+- A+ 채점 수동 실행 전환 (손절가 입력 후 버튼)
 
 ---
 
-### v3.0 — 기간별 대시보드 + 장기 패턴 분석 🔜
-**브랜치:** `feature/dashboard-v2`
+### v3.0 — Market Scanner 🔜
+**브랜치:** `feature/market-scanner`
 
-> v2.2의 ICT 탐지 기반을 확장한 단계
+- Bybit Kline API 주기적 폴링
+- 실시간 A+ 채점 기준으로 셋업 감지
+- 알림 시스템 (텔레그램 or 슬랙)
+- 스타일 레이어 기초 설계 (ICT 외 이론 확장 준비)
 
-- 기간별 성과 대시보드 (주간/월간)
-- 장기 반복 약점 추적
-- 패턴 임베딩 + A+ 셋업 유사도 분석
+---
+
+### v4.0 — Trade Journal 🔜
+**브랜치:** `feature/trade-journal`
+
+- 진입 시점 근거 직접 기록 (손절가/진입 근거 사전 입력)
+- 포지션 오픈 중 모니터링
+- 청산 감지 → 자동 복기 실행
+- 진입 의도 vs 실제 ICT 패턴 교차 검증
+- 타이밍 불일치 문제 완전 해소
+
+---
+
+### v5.0 — Personal Coach 🔜
+**브랜치:** `feature/personal-coach`
+
+- 트레이더별 스타일 레이어 (ICT 외 다른 이론)
+- 데이터 누적 기반 퍼스널 코칭
+- TradeCoach harness 구조 완성
 
 ---
 
@@ -126,8 +150,9 @@ ict/mss.py             # MSS / BOS
 | v2.1 | 거래 복기 뷰어, Trade Context Viewer | Replay, 실시간 복기 |
 | v2.1 | 기본 ICT 패턴(FVG 중심) 감지 | ICT 패턴 자동 감지 |
 | v2.2 | A+ 채점, ICT 탐지 엔진 | (사용 가능) |
-| v2.3+ | Replay Coach | (v2.1~v2.2에서 사용 금지) |
-| v3.0 | 기간별 대시보드, 장기 패턴 분석 | (v2.x에서 사용 금지) |
+| v2.3 | Replay Coach, 손절가/RR, 포지션 사이징 | (v2.1~v2.2에서 사용 금지) |
+| v3.0 | Market Scanner, 실시간 셋업 감지 | (v2.x에서 사용 금지) |
+| v4.0 | Trade Journal, 진입 의도 기록 | (v3.x 이전 사용 금지) |
 
 ---
 
