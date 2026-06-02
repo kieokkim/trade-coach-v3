@@ -118,6 +118,14 @@ def init_db() -> None:
             except Exception:
                 pass
 
+        # user_settings 테이블
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+
         # trade_tags 테이블
         conn.execute("""
             CREATE TABLE IF NOT EXISTS trade_tags (
@@ -160,6 +168,26 @@ def save_trade_tag(
             """,
             (session_id, order_id, symbol, ict_tag, user_confirmed,
              fixed_loss, ideal_qty, actual_qty, stop_price, datetime.utcnow().isoformat()),
+        )
+
+
+def get_setting(key: str, default: str = "") -> str:
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT value FROM user_settings WHERE key=?", (key,)
+            ).fetchone()
+        return row["value"] if row else default
+    except Exception:
+        return default
+
+
+def save_setting(key: str, value: str) -> None:
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO user_settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, value),
         )
 
 

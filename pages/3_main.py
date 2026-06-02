@@ -35,7 +35,7 @@ from ict.fvg_detector import detect_fvg
 from ict.ob_detector import detect_ob
 from ict.trend_detector import detect_trendline
 from market.candles import get_candles, validate_price_in_candle
-from db import save_trade_tag, load_trade_tags
+from db import save_trade_tag, load_trade_tags, get_setting, save_setting
 from utils.styles import (inject_global_css, render_sidebar_brand,
                            render_dashboard_header, render_kpi_cards,
                            render_trade_table, render_section_header)
@@ -105,7 +105,25 @@ stats     = st.session_state.get("last_stats", {})
 total_pnl = sum(float(t.get("closedPnl", 0) or 0) for t in raw_trades)
 pnl_display = f"+${total_pnl:.2f}" if total_pnl >= 0 else f"-${abs(total_pnl):.2f}"
 
+_default_loss_saved = float(get_setting("default_fixed_loss", "0") or "0")
+if "default_fixed_loss" not in st.session_state:
+    st.session_state["default_fixed_loss"] = _default_loss_saved
+
 with st.sidebar.expander("📊 대시보드", expanded=True):
+    st.markdown("**💰 기본 고정 손실 금액**")
+    _new_default = st.number_input(
+        "거래당 최대 손실 ($)",
+        min_value=0.0,
+        value=st.session_state["default_fixed_loss"],
+        step=1.0,
+        key="sidebar_default_loss",
+        help="모든 거래의 포지션 사이징 기본값. 거래별로 개별 조정 가능.",
+    )
+    if _new_default != st.session_state["default_fixed_loss"]:
+        save_setting("default_fixed_loss", str(_new_default))
+        st.session_state["default_fixed_loss"] = _new_default
+    st.divider()
+
     kpi_desc_html = """
 <div style="background:#1E2A3A;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:11px;line-height:1.8;color:#A8B8C8">
 <b style="color:#7EB8D4">📐 지표 설명</b><br>
@@ -327,13 +345,18 @@ else:
         st.markdown("#### 💰 포지션 사이징")
         _ps_col1, _ps_col2, _ps_col3 = st.columns(3)
         with _ps_col1:
+            _saved_fixed   = float(
+                st.session_state["trade_tags"].get(order_id, {}).get("fixed_loss", 0.0) or 0.0
+            )
+            _default_fixed = st.session_state.get("default_fixed_loss", 0.0)
+            _init_fixed    = _saved_fixed if _saved_fixed > 0 else _default_fixed
             fixed_loss = st.number_input(
                 "고정 손실 금액 ($)",
                 min_value=0.0,
-                value=0.0,
+                value=float(_init_fixed),
                 step=1.0,
                 key=f"fixed_loss_{order_id}",
-                help="이 거래에서 허용할 최대 손실 금액",
+                help="기본값에서 이 거래만 개별 조정 가능",
             )
 
         _entry_p    = float(buy_t.get("execPrice", 0))
