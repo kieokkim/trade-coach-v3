@@ -361,3 +361,49 @@
 - 홀딩 시간 데이터로 행동 패턴 객관화 가능
 
 **구현:** `_has_early_exit()` + `조기청산_패턴` 규칙, journal_write_node에서 buy/sell 페어링으로 execTime(진입)/exitTime(청산) 파생
+
+---
+
+### Decision 27: execPrice 캔들 범위 검증 도입
+**결정:** `validate_price_in_candle()` 함수로 execPrice가 해당 캔들 범위 안에 있는지 검증
+
+**이유:**
+- 실제 Bybit API 거래내역 연동 시 에이전트 신뢰도 핵심
+- 슬리피지 발생 시 사용자에게 명시적 경고
+- 샘플/실제 데이터 모두 동일한 검증 로직 적용
+
+**트레이드오프:**
+- 샘플 데이터는 클램핑으로 범위 내 강제 설정
+- 실제 데이터는 클램핑 없이 경고만 표시 (원본 유지)
+- Sell은 Sell 시점 캔들 기준으로 별도 검증
+
+**구현:** `market/candles.py`에 `normalize_exec_time()` + `validate_price_in_candle()` 추가, 복기 차트 후 경고 표시
+
+---
+
+### Decision 28: 포지션 사이징 레이어 구조
+**결정:** 기본값(전체) + 거래별 override 2단계 구조
+
+**공식:** 적정 수량 = 고정 손실 금액 / |진입가 - 손절가|
+
+**이유:**
+- ICT 철학: 매 거래 손실금액 사전 고정 → 기본값 설정이 정석
+- 입문자는 거래별로 다르게 실험 → override 필요
+- user_settings 테이블로 기본값 영구 저장
+
+**UI 위치:** 복기 뷰어 상위 expander → 항상 접근 가능
+
+**구현:** `db.py`에 `user_settings` 테이블 + `get_setting/save_setting`, trade_tags에 `fixed_loss/ideal_qty/actual_qty` 컬럼
+
+---
+
+### Decision 29: 샘플 데이터 실제 시장가 기반 재생성
+**결정:** execPrice를 실제 Bybit Kline API 기반으로 하드픽스
+
+**이유:**
+- 시간대와 가격 미스매칭 시 에이전트 신뢰도 저하
+- Buy: 해당 캔들 open 가격 기준
+- Sell: Buy execPrice + closedPnl / orderQty 역산, Sell 시점 캔들 범위로 클램핑
+- closedPnl도 실제 클램핑된 가격 기준으로 재계산
+
+**구현:** `scripts/generate_sample_trades.py` (Buy/Sell 각각 Bybit API 조회 + 클램핑), `scripts/generate_sample_candles.py` (캔들 재생성)
