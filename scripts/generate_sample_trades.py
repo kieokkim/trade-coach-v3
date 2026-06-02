@@ -67,10 +67,15 @@ for level, filepath in SAMPLE_FILES.items():
         base_id = t["orderId"].replace("-buy", "")
         if price:
             entry_price = price["open"]
+            # open이 캔들 범위 밖이면 mid로 fallback
+            if not (price["low"] <= entry_price <= price["high"]):
+                entry_price = price["mid"]
             t["execPrice"] = f"{entry_price:.2f}"
             buy_map[base_id] = {
                 "price": entry_price,
                 "qty":   float(t.get("orderQty", 1)),
+                "low":   price["low"],
+                "high":  price["high"],
             }
             print(f"  Buy  {symbol} {dt_str} → {entry_price:.2f}")
         else:
@@ -93,6 +98,10 @@ for level, filepath in SAMPLE_FILES.items():
         entry_price = buy_info["price"]
         if order_qty > 0:
             exit_price = entry_price + closed_pnl / order_qty
+            # 캔들 범위 내로 클램핑 (샘플 데이터 한정)
+            candle_low  = buy_info.get("low",  exit_price)
+            candle_high = buy_info.get("high", exit_price)
+            exit_price = max(candle_low, min(exit_price, candle_high))
             t["execPrice"] = f"{exit_price:.2f}"
             symbol  = t["symbol"]
             exec_ms = int(t["execTime"])

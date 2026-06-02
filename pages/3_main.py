@@ -34,7 +34,7 @@ from nodes.entry_reason_node import entry_reason_node
 from ict.fvg_detector import detect_fvg
 from ict.ob_detector import detect_ob
 from ict.trend_detector import detect_trendline
-from market.candles import get_candles
+from market.candles import get_candles, validate_price_in_candle
 from db import save_trade_tag, load_trade_tags
 from utils.styles import (inject_global_css, render_sidebar_brand,
                            render_dashboard_header, render_kpi_cards,
@@ -528,6 +528,13 @@ else:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
         st.plotly_chart(fig, use_container_width=True, key=f"candle_{order_id}")
+
+        _entry_v = validate_price_in_candle(float(buy_t.get("execPrice", 0)), candles, entry_ms)
+        _exit_v  = validate_price_in_candle(float(sell_t.get("execPrice", 0)), candles, exit_ms)
+        if not _entry_v["valid"] and _entry_v.get("warning"):
+            st.warning(f"⚠️ 진입가 {_entry_v['warning']}")
+        if not _exit_v["valid"] and _exit_v.get("warning"):
+            st.warning(f"⚠️ 청산가 {_exit_v['warning']}")
 
         # ── A+ 채점 결과 ──
         aplus_result = st.session_state.get(cache_key_aplus)

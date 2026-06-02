@@ -7,6 +7,41 @@ from pybit.unified_trading import HTTP
 
 logger = logging.getLogger(__name__)
 
+
+def normalize_exec_time(exec_ms: int, interval_min: int = 15) -> int:
+    """execTime을 해당 캔들 시작 타임스탬프로 정규화."""
+    interval_ms = interval_min * 60 * 1000
+    return (exec_ms // interval_ms) * interval_ms
+
+
+def validate_price_in_candle(
+    price: float,
+    candles: list[dict],
+    exec_ms: int,
+    interval_min: int = 15,
+) -> dict:
+    """execPrice가 해당 캔들 범위 안에 있는지 검증."""
+    candle_start = normalize_exec_time(exec_ms, interval_min)
+    matched = [c for c in candles if c["timestamp"] == candle_start]
+
+    if not matched:
+        matched = sorted(candles, key=lambda x: abs(x["timestamp"] - exec_ms))[:1]
+
+    if not matched:
+        return {"valid": False, "candle_low": 0.0, "candle_high": 0.0, "warning": "캔들 없음"}
+
+    c = matched[0]
+    low, high = float(c["low"]), float(c["high"])
+    valid = low <= price <= high
+
+    return {
+        "valid":       valid,
+        "candle_low":  low,
+        "candle_high": high,
+        "warning":     "" if valid else f"슬리피지 감지: {price:.2f} (캔들 범위 {low:.2f}~{high:.2f})",
+    }
+
+
 CANDLE_FILE_MAP = {
     "sample_1":     "data/sample_candles.json",
     "sample_2":     "data/sample_candles.json",
