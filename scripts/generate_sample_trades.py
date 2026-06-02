@@ -1,7 +1,8 @@
 """
 샘플 거래 데이터의 execPrice를 실제 Bybit 시장가 기반으로 재설정.
-Buy: 해당 시점 캔들 open 가격.
-Sell: entry_price + closedPnl / orderQty 역산.
+Buy:  해당 시점 캔들 open 가격 (범위 밖이면 mid fallback).
+Sell: entry_price + closedPnl / orderQty 역산 후 Sell 시점 캔들 범위로 클램핑.
+      클램핑으로 exit_price 변경 시 closedPnl 재계산.
 execTime은 변경하지 않음.
 """
 import json
@@ -12,15 +13,17 @@ from datetime import datetime, timezone
 from pybit.unified_trading import HTTP
 
 session = HTTP(testnet=False)
+INTERVAL = "15"
+LIMIT    = 50
 
 
 def get_price_at_time(symbol: str, exec_ms: int) -> dict:
-    """해당 시점 캔들 1개 조회."""
+    """해당 시점 캔들 1개 조회 (±1봉 범위)."""
     try:
         resp = session.get_kline(
             category="linear",
             symbol=symbol,
-            interval="15",
+            interval=INTERVAL,
             start=exec_ms - 15 * 60 * 1000,
             end=exec_ms + 15 * 60 * 1000,
             limit=3,
@@ -39,6 +42,34 @@ def get_price_at_time(symbol: str, exec_ms: int) -> dict:
     except Exception as e:
         print(f"  ⚠️  get_price_at_time 실패 {symbol} {exec_ms}: {e}")
         return {}
+
+
+def fetch_candles(symbol: str, exec_ms: int) -> list[dict]:
+    """해당 시점 전후 LIMIT봉 조회."""
+    start = exec_ms - (int(INTERVAL) * 60 * 1000 * (LIMIT // 2))
+    try:
+        resp = session.get_kline(
+            category="linear",
+            symbol=symbol,
+            interval=INTERVAL,
+            start=start,
+            limit=LIMIT,
+        )
+        candles = [
+            {
+                "timestamp": int(row[0]),
+                "open":   float(row[1]),
+                "high":   float(row[2]),
+                "low":    float(row[3]),
+                "close":  float(row[4]),
+            }
+            for row in resp["result"]["list"]
+        ]
+        candles.sort(key=lambda x: x["timestamp"])
+        return candles
+    except Exception as e:
+        print(f"  ⚠️  fetch_candles 실패 {symbol} {exec_ms}: {e}")
+        return []
 
 
 SAMPLE_FILES = {
@@ -62,22 +93,19 @@ for level, filepath in SAMPLE_FILES.items():
         exec_ms = int(t["execTime"])
         dt_str  = datetime.fromtimestamp(exec_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         price   = get_price_at_time(symbol, exec_ms)
-        time.sleep(0.3)  # rate-limit 회피
+        time.sleep(0.3)
 
         base_id = t["orderId"].replace("-buy", "")
         if price:
             entry_price = price["open"]
-            # open이 캔들 범위 밖이면 mid로 fallback
             if not (price["low"] <= entry_price <= price["high"]):
                 entry_price = price["mid"]
-            t["execPrice"] = f"{entry_price:.2f}"
+            t["execPrice"] = f"{entry_price:.4f}"
             buy_map[base_id] = {
                 "price": entry_price,
                 "qty":   float(t.get("orderQty", 1)),
-                "low":   price["low"],
-                "high":  price["high"],
             }
-            print(f"  Buy  {symbol} {dt_str} → {entry_price:.2f}")
+            print(f"  Buy  {symbol} {dt_str} → {entry_price:.4f}")
         else:
             buy_map[base_id] = {
                 "price": float(t.get("execPrice", 0)),
@@ -85,28 +113,50 @@ for level, filepath in SAMPLE_FILES.items():
             }
             print(f"  Buy  {symbol} {dt_str} → 캔들 없음, 기존 가격 유지")
 
-    # Pass 2: Sell 가격 역산
+    # Pass 2: Sell 가격 역산 + Sell 시점 캔들 클램핑
     for t in trades:
         if t["side"] != "Sell":
             continue
-        base_id    = t["orderId"].replace("-sell", "")
-        buy_info   = buy_map.get(base_id)
+        base_id      = t["orderId"].replace("-sell", "")
+        buy_info     = buy_map.get(base_id)
         if not buy_info:
             continue
-        closed_pnl  = float(t.get("closedPnl", 0))
-        order_qty   = float(t.get("orderQty", buy_info["qty"]))
-        entry_price = buy_info["price"]
-        if order_qty > 0:
-            exit_price = entry_price + closed_pnl / order_qty
-            # 캔들 범위 내로 클램핑 (샘플 데이터 한정)
-            candle_low  = buy_info.get("low",  exit_price)
-            candle_high = buy_info.get("high", exit_price)
-            exit_price = max(candle_low, min(exit_price, candle_high))
-            t["execPrice"] = f"{exit_price:.2f}"
-            symbol  = t["symbol"]
-            exec_ms = int(t["execTime"])
-            dt_str  = datetime.fromtimestamp(exec_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-            print(f"  Sell {symbol} {dt_str} → {exit_price:.2f} (pnl={closed_pnl:+.2f})")
+
+        closed_pnl   = float(t.get("closedPnl", 0))
+        order_qty    = float(t.get("orderQty", buy_info["qty"]))
+        entry_price  = buy_info["price"]
+        symbol       = t["symbol"]
+        sell_exec_ms = int(t["execTime"])
+        dt_str       = datetime.fromtimestamp(sell_exec_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+        if order_qty <= 0:
+            continue
+
+        original_exit = entry_price + closed_pnl / order_qty
+        exit_price    = original_exit
+
+        # Sell 시점 캔들 별도 조회 후 클램핑
+        sell_candles = fetch_candles(symbol, sell_exec_ms)
+        time.sleep(0.3)
+
+        if sell_candles:
+            sell_nearest = min(sell_candles, key=lambda x: abs(x["timestamp"] - sell_exec_ms))
+            s_low  = sell_nearest["low"]
+            s_high = sell_nearest["high"]
+            exit_price = max(s_low, min(original_exit, s_high))
+
+            if not (s_low <= original_exit <= s_high):
+                print(f"    ⚠️  {base_id} 청산가 조정: {original_exit:.4f} → {exit_price:.4f}")
+                print(f"        Sell 캔들 범위: {s_low:.4f}~{s_high:.4f}")
+
+        t["execPrice"] = f"{exit_price:.4f}"
+        t["execValue"] = f"{exit_price * order_qty:.4f}"
+
+        # 클램핑으로 exit_price 변경 시 closedPnl 재계산
+        actual_pnl     = (exit_price - entry_price) * order_qty
+        t["closedPnl"] = f"{actual_pnl:.2f}"
+
+        print(f"  Sell {symbol} {dt_str} → {exit_price:.4f} (pnl={actual_pnl:+.2f})")
 
     Path(filepath).write_text(
         json.dumps(data, ensure_ascii=False, indent=2)
