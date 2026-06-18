@@ -7,6 +7,11 @@ on:
         description: "Claude Code에 전달할 작업 지시"
         required: true
         type: string
+      branch:
+        description: "작업 기준 브랜치"
+        required: false
+        default: "main"
+        type: string
 
 jobs:
   claude-agent:
@@ -19,6 +24,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -46,6 +52,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "feat: claude agent automated change"
+          base: ${{ inputs.branch }}
           branch: claude-agent/${{ github.run_id }}
           title: "[Claude Agent] ${{ inputs.prompt }}"
           body: |
