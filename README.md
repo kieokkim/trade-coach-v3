@@ -31,14 +31,38 @@ streamlit run streamlit_app.py
 ## 프로젝트 구조
 ```
 trade-coach/
-├── graph.py          # TradeCoachState + 그래프 정의
-├── config.py
-├── db.py
-├── nodes/            # 각 노드 구현 (.py)
+├── graph.py                # TradeCoachState 정의 + LangGraph 파이프라인 조립
+├── config.py               # KPI 임계값 설정 (승률/기대값/손절 일관성 등)
+├── db.py                   # SQLite 커넥션 관리 + 스키마 초기화/마이그레이션
+├── streamlit_app.py        # Streamlit 웹 UI
+├── final_notebook.ipynb    # Jupyter 데모 노트북
+├── nodes/                  # LangGraph 노드 구현
+│   ├── fetch_nodes.py      #   Bybit API 데이터 수집 + 신규 체결 확인
+│   ├── preprocess_nodes.py #   원본 거래 데이터 전처리
+│   ├── journal_nodes.py    #   거래별 매매일지 자동 생성
+│   ├── analysis_nodes.py   #   매매일지 분석 + 약점 탐지
+│   ├── performance_nodes.py#   성과 KPI 산출 (수익률/기대값/손절 일관성)
+│   ├── chart_nodes.py      #   차트 이미지 분석 + 피드백
+│   ├── coaching_nodes.py   #   ICT 코칭 + fallback 분류
+│   ├── quiz_nodes.py       #   약점 기반 퀴즈 생성
+│   └── memory_nodes.py     #   세션 결과 DB 저장
 ├── tools/
+│   ├── concept_tool.py     # ICT 개념 검색 도구
+│   └── ict_concepts.json   # ICT 개념 사전 (25개)
 ├── data/
-├── streamlit_app.py
-└── final_notebook.ipynb
+│   └── sample_trades.json  # 샘플 거래 데이터
+├── docs/                   # 설계 문서 (.docx)
+└── .env.example            # 환경변수 템플릿
+```
+
+### LangGraph 파이프라인
+```
+START → memory_load → new_data_check ─┬─ (신규 데이터 있음) → bybit_fetch → preprocess
+                                      └─ (없음) → END        → journal_write → journal_analysis
+                                                               → performance_analysis → weakness_detect
+                                                               ─┬─ (ICT 매칭) → backtest_coach
+                                                                └─ (fallback)  → fallback_classify → backtest_coach
+                                                               → quiz_generate → memory_save → END
 ```
 
 ---
