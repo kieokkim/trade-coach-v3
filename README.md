@@ -31,14 +31,46 @@ streamlit run streamlit_app.py
 ## 프로젝트 구조
 ```
 trade-coach/
-├── graph.py          # TradeCoachState + 그래프 정의
-├── config.py
-├── db.py
-├── nodes/            # 각 노드 구현 (.py)
+├── graph.py                 # TradeCoachState 정의 + LangGraph 그래프 빌드
+├── config.py                # KPI 임계값 설정 (승률/기대값/손절 일관성 등)
+├── db.py                    # SQLite DB 초기화·마이그레이션 (weaknesses, trade_history, quiz_results, performance_snapshots)
+├── streamlit_app.py         # Streamlit 웹 UI
+├── final_notebook.ipynb     # Jupyter 노트북 (수정 금지)
+│
+├── nodes/                   # LangGraph 노드 구현
+│   ├── fetch_nodes.py       #   Bybit API 체결 수집 / 샘플 데이터 로드
+│   ├── preprocess_nodes.py  #   원시 체결 → 분석용 stats 전처리
+│   ├── journal_nodes.py     #   거래별 매매일지 자동 생성
+│   ├── analysis_nodes.py    #   매매일지 통계 분석 + 약점 탐지
+│   ├── performance_nodes.py #   성과 요약 KPI (승률 추이/기대값/셋업별 수익률)
+│   ├── coaching_nodes.py    #   ICT 개념 기반 맞춤 코칭 + fallback 분류
+│   ├── chart_nodes.py       #   차트 이미지 분석 + 피드백
+│   ├── quiz_nodes.py        #   약점 기반 퀴즈 생성
+│   └── memory_nodes.py      #   세션 결과 DB 저장
+│
 ├── tools/
+│   ├── concept_tool.py      # ICT 개념 검색 LangChain Tool
+│   └── ict_concepts.json    # ICT 개념 사전 (25개)
+│
 ├── data/
-├── streamlit_app.py
-└── final_notebook.ipynb
+│   └── sample_trades.json   # Bybit API 없을 때 사용하는 샘플 체결 데이터
+│
+├── docs/                    # 설계 문서 (노드 설계서, API 명세, DB 스키마 등)
+├── .env.example             # 환경변수 템플릿 (OPENAI_API_KEY, BYBIT_API_KEY/SECRET)
+└── pyproject.toml           # uv 프로젝트 설정 (Python ≥3.13)
+```
+
+### LangGraph 실행 흐름
+```
+START
+  → memory_load        (DB에서 과거 약점·이력 로드)
+  → new_data_check     (Bybit 신규 체결 확인)
+  ├─ has_new → bybit_fetch → preprocess → journal_write
+  │    → journal_analysis → performance_analysis → weakness_detect
+  │    ├─ concept_not_found → fallback_classify → backtest_coach
+  │    └─ found → backtest_coach
+  │         → quiz_generate → memory_save → END
+  └─ no_new → END
 ```
 
 ---
