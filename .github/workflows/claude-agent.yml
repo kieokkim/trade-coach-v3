@@ -1,0 +1,67 @@
+name: Claude Code Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Claude Code에 전달할 작업 지시"
+        required: true
+        type: string
+      branch:
+        description: "작업 기준 브랜치"
+        required: false
+        default: "main"
+        type: string
+
+jobs:
+  claude-agent:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run Claude Code
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          claude --print --dangerously-skip-permissions \
+            "${{ inputs.prompt }}"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "feat: claude agent automated change"
+          base: ${{ inputs.branch }}
+          branch: claude-agent/${{ github.run_id }}
+          title: "[Claude Agent] ${{ inputs.prompt }}"
+          body: |
+            ## Claude Code Agent 자동 생성 PR
+
+            **Prompt:**
+            ```
+            ${{ inputs.prompt }}
+            ```
+
+            **Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          labels: claude-agent
