@@ -427,3 +427,29 @@
 - sweep 패턴 50% — 별도 검증 로직 필요 (Liquidity Sweep 미구현 상태)
 
 **구현:** `nodes/entry_reason_node.py` (fvg_before/ob_before 필터), `scripts/generate_sample_candles.py` (구조 검증+주입), `scripts/eval_aplus_validation.py` (자동 검증)
+
+---
+
+### Decision 31: 멀티모델 비교 평가 - Groq llama-3.3-70b 채택 검토
+**결정:** entry_reason_node 비교 결과, Groq(llama-3.3-70b-versatile)가 OpenAI(gpt-4o-mini) 대비 응답속도 2.5배, 품질지표(기준언급) 우위 확인
+
+**검증 방법:**
+entry_reason_node를 그대로 재사용해서 LLM_PROVIDER만 교체. expert 샘플 5건에 대해 응답시간/기준언급수/길이/루프여부 측정.
+
+**결과 (5건 기준):**
+- 응답시간: OpenAI 2.82s / Groq 1.13s
+- 기준 언급(구조/추세/킬존 등 7개 중): OpenAI 4.6 / Groq 5.4
+- 평균 길이: OpenAI 256자 / Groq 309자
+- 루프/너무짧음: 둘 다 0건
+
+**중요 단서:**
+이전(v2.2~v2.3) journal_write_node에서 Groq의 작은 모델(llama-3.1-8b-instant)은 rate limit + 루프 버그가 있었음. 지금 결과는 더 큰 모델(llama-3.3-70b-versatile) 기준이라 "Groq가 항상 우수하다"가 아니라 "모델 크기가 품질을 좌우한다"는 결론이 더 정확함.
+
+**한계:**
+표본 5건은 파일럿 수준. 응답시간은 네트워크 상태에 따라 변동 가능. 통계적 확정을 위해선 표본 확대 필요.
+
+**향후 결정:**
+- entry_reason_node, backtest_coach 등 task="complex" 노드는 Groq llama-3.3-70b를 기본값으로 전환 검토
+- journal_write 등 task="default" 노드는 기존 작은 모델 유지 (단순 팩트 서술이라 모델 크기 영향 적음)
+
+**구현:** `scripts/eval_multimodel_comparison.py` (자동 비교 스크립트)
