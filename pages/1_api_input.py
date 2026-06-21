@@ -2,6 +2,7 @@ import os
 
 import streamlit as st
 
+from utils.api_safety import check_api_permissions
 from utils.styles import inject_global_css, render_sidebar_brand
 
 st.set_page_config(page_title="TradeCoach | API 연결", page_icon="🔑", layout="centered")
@@ -73,14 +74,41 @@ with st.form("api_form"):
 
 if submitted:
     if api_key.strip() and api_secret.strip():
-        os.environ["BYBIT_API_KEY"] = api_key.strip()
-        os.environ["BYBIT_API_SECRET"] = api_secret.strip()
-        st.session_state["api_ready"] = True
-        st.session_state.pop("sample_mode", None)
-        st.success("API 연결 성공! 데이터 수집 페이지로 이동합니다...")
-        st.switch_page("pages/2_loading.py")
+        with st.spinner("API 키 권한 확인 중..."):
+            perm_check = check_api_permissions(api_key.strip(), api_secret.strip())
+
+        if not perm_check["valid"]:
+            st.error(perm_check["warning"])
+        elif not perm_check["read_only"]:
+            st.warning(perm_check["warning"])
+            st.caption(
+                "그래도 계속하시겠습니까? TradeCoach는 거래를 "
+                "실행하지 않지만, 안전을 위해 read-only 키 사용을 권장합니다."
+            )
+            st.session_state["api_perm_warning"] = True
+            st.session_state["api_key_pending"] = api_key.strip()
+            st.session_state["api_secret_pending"] = api_secret.strip()
+        else:
+            os.environ["BYBIT_API_KEY"] = api_key.strip()
+            os.environ["BYBIT_API_SECRET"] = api_secret.strip()
+            st.session_state["api_ready"] = True
+            st.session_state.pop("sample_mode", None)
+            st.success("✅ 연결 확인 완료 (read-only 키 확인됨)")
+            st.switch_page("pages/2_loading.py")
     else:
         st.error("API Key와 Secret을 모두 입력해주세요.")
+
+if st.session_state.get("api_perm_warning"):
+    if st.checkbox("권한 경고를 확인했으며 계속 진행합니다"):
+        os.environ["BYBIT_API_KEY"] = st.session_state["api_key_pending"]
+        os.environ["BYBIT_API_SECRET"] = st.session_state["api_secret_pending"]
+        st.session_state["api_ready"] = True
+        st.session_state.pop("sample_mode", None)
+        st.session_state.pop("api_perm_warning", None)
+        st.session_state.pop("api_key_pending", None)
+        st.session_state.pop("api_secret_pending", None)
+        st.success("✅ 연결 확인 완료 (거래 권한 있는 키 - 주의)")
+        st.switch_page("pages/2_loading.py")
 
 st.divider()
 st.subheader("🎮 데모 모드")
