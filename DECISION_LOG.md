@@ -407,3 +407,23 @@
 - closedPnl도 실제 클램핑된 가격 기준으로 재계산
 
 **구현:** `scripts/generate_sample_trades.py` (Buy/Sell 각각 Bybit API 조회 + 클램핑), `scripts/generate_sample_candles.py` (캔들 재생성)
+
+---
+
+### Decision 30: A+ 채점 Eval 검증 - look-ahead bias 발견 및 수정
+**결정:** structure_entry 판정에 진입 시점 이전 구조만 사용하도록 제한
+
+**발견 과정:**
+1. 샘플 데이터 orderId 패턴(fvg-/ob-/sweep-/random-)을 Ground Truth로 활용한 자동 검증 스크립트 작성
+2. 1차 검증: random 거래 81%가 "구조 진입"으로 오판정 (정확도 19%)
+3. 원인: FVG/OB 탐지가 진입 시점 이후 구조까지 포함 (데이터 누수)
+4. 1차 수정 후 재검증: random 개선(19→33%)했으나 fvg/ob 회귀(100→71%, 67%)
+5. 2차 원인: 검증 함수 자체가 "구조 존재"와 "가격이 구조 안"을 혼동
+6. 2차 수정: 가격 포함 여부까지 검증하도록 보정
+7. 최종 결과: fvg 100%, ob 100% 회복, 전체 정확도 47.2%→58.3%
+
+**잔여 이슈:**
+- random 정확도 33% (개선 후 그대로) — 버그가 아니라 실제 시장의 자연적 FVG/OB 발생 노이즈로 판단
+- sweep 패턴 50% — 별도 검증 로직 필요 (Liquidity Sweep 미구현 상태)
+
+**구현:** `nodes/entry_reason_node.py` (fvg_before/ob_before 필터), `scripts/generate_sample_candles.py` (구조 검증+주입), `scripts/eval_aplus_validation.py` (자동 검증)
