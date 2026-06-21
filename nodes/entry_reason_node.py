@@ -46,8 +46,12 @@ def score_aplus(
 
     s, bd = 0, {}
 
-    # 1. 구조 진입: 진입가가 FVG/OB 구간 내
-    bd["structure_entry"] = any(_in_zone(price, z) for z in fvg + ob)
+    fvg_before = [z for z in fvg if z.get("timestamp", 0) < exec_ms]
+    ob_before = [z for z in ob if z.get("timestamp", 0) < exec_ms]
+    all_zones = fvg_before + ob_before
+
+    # 1. 구조 진입: 진입가가 진입 이전 FVG/OB 구간 내
+    bd["structure_entry"] = any(_in_zone(price, z) for z in all_zones)
     if bd["structure_entry"]:
         s += 1
 
@@ -56,7 +60,6 @@ def score_aplus(
         [c for c in candles if c["timestamp"] < exec_ms],
         key=lambda x: x["timestamp"],
     )[-2:]
-    all_zones = fvg + ob
     bd["bounce_confirm"] = bool(all_zones and any(
         _near_zone(float(c["low"]), z)
         for c in before_2
