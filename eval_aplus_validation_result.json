@@ -1,0 +1,486 @@
+{
+  "total": 36,
+  "matched": 21,
+  "accuracy": 58.333333333333336,
+  "by_pattern": {
+    "random": {
+      "match": 7,
+      "total": 21
+    },
+    "fvg": {
+      "match": 7,
+      "total": 7
+    },
+    "ob": {
+      "match": 6,
+      "total": 6
+    },
+    "sweep": {
+      "match": 1,
+      "total": 2
+    }
+  },
+  "mismatches": [
+    {
+      "level": "beginner",
+      "order_id": "random-b1-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b2-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b4-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 5
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b5-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b8-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b9-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 5
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b10-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i1-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 5
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i2-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i4-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i6-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i7-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i9-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "expert",
+      "order_id": "random-e4-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "expert",
+      "order_id": "sweep-e10-buy",
+      "ground_truth": true,
+      "ground_truth_label": "유동성 스윕 진입",
+      "ai_judgment": false,
+      "match": false,
+      "ai_score": 4
+    }
+  ],
+  "all_results": [
+    {
+      "level": "beginner",
+      "order_id": "random-b1-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b2-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b3-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": false,
+      "match": true,
+      "ai_score": 3
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b4-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 5
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b5-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b6-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": false,
+      "match": true,
+      "ai_score": 3
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b7-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": false,
+      "match": true,
+      "ai_score": 3
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b8-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b9-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 5
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b10-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b11-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": false,
+      "match": true,
+      "ai_score": 3
+    },
+    {
+      "level": "beginner",
+      "order_id": "random-b12-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": false,
+      "match": true,
+      "ai_score": 3
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i1-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 5
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i2-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "fvg-i3-buy",
+      "ground_truth": true,
+      "ground_truth_label": "FVG 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 5
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i4-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "ob-i5-buy",
+      "ground_truth": true,
+      "ground_truth_label": "OB 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i6-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i7-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "fvg-i8-buy",
+      "ground_truth": true,
+      "ground_truth_label": "FVG 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 5
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i9-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "intermediate",
+      "order_id": "ob-i10-buy",
+      "ground_truth": true,
+      "ground_truth_label": "OB 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 5
+    },
+    {
+      "level": "intermediate",
+      "order_id": "random-i11-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": false,
+      "match": true,
+      "ai_score": 3
+    },
+    {
+      "level": "intermediate",
+      "order_id": "fvg-i12-buy",
+      "ground_truth": true,
+      "ground_truth_label": "FVG 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 4
+    },
+    {
+      "level": "expert",
+      "order_id": "fvg-e1-buy",
+      "ground_truth": true,
+      "ground_truth_label": "FVG 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 5
+    },
+    {
+      "level": "expert",
+      "order_id": "ob-e2-buy",
+      "ground_truth": true,
+      "ground_truth_label": "OB 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 5
+    },
+    {
+      "level": "expert",
+      "order_id": "sweep-e3-buy",
+      "ground_truth": true,
+      "ground_truth_label": "유동성 스윕 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 4
+    },
+    {
+      "level": "expert",
+      "order_id": "random-e4-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": true,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "expert",
+      "order_id": "fvg-e5-buy",
+      "ground_truth": true,
+      "ground_truth_label": "FVG 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 5
+    },
+    {
+      "level": "expert",
+      "order_id": "ob-e6-buy",
+      "ground_truth": true,
+      "ground_truth_label": "OB 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 5
+    },
+    {
+      "level": "expert",
+      "order_id": "fvg-e7-buy",
+      "ground_truth": true,
+      "ground_truth_label": "FVG 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 4
+    },
+    {
+      "level": "expert",
+      "order_id": "ob-e8-buy",
+      "ground_truth": true,
+      "ground_truth_label": "OB 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 5
+    },
+    {
+      "level": "expert",
+      "order_id": "ob-e9-buy",
+      "ground_truth": true,
+      "ground_truth_label": "OB 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 4
+    },
+    {
+      "level": "expert",
+      "order_id": "sweep-e10-buy",
+      "ground_truth": true,
+      "ground_truth_label": "유동성 스윕 진입",
+      "ai_judgment": false,
+      "match": false,
+      "ai_score": 4
+    },
+    {
+      "level": "expert",
+      "order_id": "random-e11-buy",
+      "ground_truth": false,
+      "ground_truth_label": "근거 없는 진입",
+      "ai_judgment": false,
+      "match": true,
+      "ai_score": 3
+    },
+    {
+      "level": "expert",
+      "order_id": "fvg-e12-buy",
+      "ground_truth": true,
+      "ground_truth_label": "FVG 구조 진입",
+      "ai_judgment": true,
+      "match": true,
+      "ai_score": 5
+    }
+  ]
+}
