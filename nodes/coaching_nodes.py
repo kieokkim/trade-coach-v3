@@ -72,6 +72,16 @@ def backtest_coach_node(state: dict) -> dict:
     if concept_info:
         context_parts.append(f"개념 설명:\n{concept_info}")
 
+    comparison = state.get("progress_comparison")
+    if comparison:
+        context_parts.append(
+            f"\n세션 간 변화 (지난 세션: {comparison['prev_date']} → 오늘: {comparison['latest_date']}):\n"
+            f"- 해소된 약점: {', '.join(comparison['resolved']) or '없음'}\n"
+            f"- 새로 생긴 약점: {', '.join(comparison['new']) or '없음'}\n"
+            f"- 계속되는 약점: {', '.join(comparison['persistent']) or '없음'}\n"
+            f"해소된 약점은 칭찬하고, 신규 약점은 경고하고, 지속되는 약점은 더 집중적으로 코칭하세요."
+        )
+
     try:
         msg = _get_coach_llm().invoke([
             {"role": "system", "content": _COACH_SYSTEM},

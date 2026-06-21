@@ -12,6 +12,7 @@ from nodes.journal_nodes import journal_write_node
 from nodes.memory_nodes import memory_save_node
 from nodes.performance_nodes import performance_analysis_node
 from nodes.preprocess_nodes import preprocess_node
+from nodes.progress_compare_node import progress_compare_node
 
 load_dotenv()
 init_db()
@@ -48,6 +49,7 @@ class TradeCoachState(TypedDict, total=False):
     judge_passed:    bool         # 철학 기준 통과 여부
     judge_scores:    dict         # 항목별 pass/fail
     sample_mode:     str          # 'sample_1'|'sample_2'|'beginner'|'intermediate'|'expert'
+    progress_comparison: dict     # 세션 간 약점 변화 비교
 
 
 DEFAULT_STATE: TradeCoachState = {
@@ -79,6 +81,7 @@ DEFAULT_STATE: TradeCoachState = {
     "judge_result":      "",
     "judge_passed":      False,
     "judge_scores":      {},
+    "progress_comparison": None,
 }
 
 # ──────────────────────────────── Nodes ────────────────────────────────────
@@ -136,11 +139,11 @@ def route_new_data(state: TradeCoachState) -> str:
 def route_after_weakness(state: TradeCoachState) -> str:
     if state.get("concept_not_found"):
         return "fallback_classify"
-    return "backtest_coach"
+    return "progress_compare"
 
 
 def route_after_fallback(state: TradeCoachState) -> str:
-    return "backtest_coach"
+    return "progress_compare"
 
 # ──────────────────────────────── Graph ────────────────────────────────────
 
@@ -156,6 +159,7 @@ def _build_graph() -> StateGraph:
     builder.add_node("performance_analysis", performance_analysis_node)
     builder.add_node("weakness_detect",      weakness_detect_node)
     builder.add_node("fallback_classify",    fallback_classify_node)
+    builder.add_node("progress_compare",    progress_compare_node)
     builder.add_node("backtest_coach",       backtest_coach_node)
     builder.add_node("coaching_judge",       coaching_judge_node)
     builder.add_node("memory_save",          memory_save_node)
@@ -175,13 +179,14 @@ def _build_graph() -> StateGraph:
     builder.add_conditional_edges(
         "weakness_detect",
         route_after_weakness,
-        {"fallback_classify": "fallback_classify", "backtest_coach": "backtest_coach"},
+        {"fallback_classify": "fallback_classify", "progress_compare": "progress_compare"},
     )
     builder.add_conditional_edges(
         "fallback_classify",
         route_after_fallback,
-        {"backtest_coach": "backtest_coach"},
+        {"progress_compare": "progress_compare"},
     )
+    builder.add_edge("progress_compare", "backtest_coach")
     builder.add_edge("backtest_coach",  "coaching_judge")
     builder.add_edge("coaching_judge",  "memory_save")
     builder.add_edge("memory_save", END)
