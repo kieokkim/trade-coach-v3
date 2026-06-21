@@ -154,6 +154,41 @@ Ground Truth로 활용. 사람이 매번 차트를 보고 판단하는 대신,
 
 ---
 
+## 완료된 기능 — Before/After
+
+### progress_compare_node (✅ 완료, 2026-06)
+
+Before: 트레이더가 혼자 복기하면 지난 세션과 비교해서
+        나아졌는지 스스로 알 수 없음. 세션 메모리가
+        기록만 하고 "변화 인지" 로직이 없었음.
+
+After: weaknesses 테이블의 last_seen 날짜 기준으로
+       가장 최근 두 날짜의 약점 분포를 비교해서
+       resolved(해소)/new(신규)/persistent(지속)로 자동 분류.
+       backtest_coach 프롬프트에 비교 결과를 주입해서
+       "해소된 약점은 칭찬, 신규는 경고, 지속은 집중 코칭"하도록 연결.
+
+트러블슈팅 — 레거시 데이터 오염:
+  발견: 실제 DB로 비교를 돌렸을 때 'BTC_개선필요' 같은
+        종목명 기반 태그가 'new'로 잘못 분류됨
+  원인: v2.2에서 약점 태그를 ICT 개념 기반으로 전환했지만(Decision 17)
+        DB에 이미 저장된 v2.0~v2.1 시절 레거시 데이터가 남아있었음
+  해결: DELETE FROM weaknesses WHERE weakness LIKE '%_개선필요'
+        실행 후 재검증 → 깨끗한 ICT 기반 비교 결과 확인
+  교훈: 기능 변경 시 코드만 바꾸는 게 아니라 기존 DB 데이터의
+        하위호환성도 함께 점검해야 함
+
+구현 위치:
+  nodes/progress_compare_node.py (rule-based, LLM 미사용)
+  graph.py (weakness_detect → progress_compare → backtest_coach)
+  nodes/coaching_nodes.py (comparison 텍스트 프롬프트 주입)
+  pages/3_main.py (사이드바 "📈 지난 세션 대비" 섹션)
+
+포트폴리오 반영: KPI 후보로 "재방문 사용자의 약점 재발률"
+  측정 가능해짐 — 다음 단계에서 실제 수치화 필요
+
+---
+
 ## 보류 — 지금 단계에서 하지 않아도 되는 것
 
 Voice agent(Whisper), Fine-tuning(RFT/DPO/SFT), Browser agent, MCP 등은
