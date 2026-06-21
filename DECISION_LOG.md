@@ -453,3 +453,12 @@ entry_reason_node를 그대로 재사용해서 LLM_PROVIDER만 교체. expert �
 - journal_write 등 task="default" 노드는 기존 작은 모델 유지 (단순 팩트 서술이라 모델 크기 영향 적음)
 
 **구현:** `scripts/eval_multimodel_comparison.py` (자동 비교 스크립트)
+
+---
+
+### Decision 32: Bybit API 권한 분리 - read-only 강제
+**결정:** API 키 입력 시 get_api_key_information()으로 권한 확인, 거래 관련 권한(Order/Trade/Withdraw) 감지 시 경고 + 사용자 확인 요구
+
+**검증:** 실제 본인 .env 키로 테스트한 결과 7개 거래 권한(ContractTrade:Order, Spot:SpotTrade, Options:OptionsTrade, DerivativesTrade, FiatP2POrder 등) 정확히 탐지됨. 이는 실제로 분석 전용 용도에 맞지 않는 키였음을 발견한 것으로, 보안 설계의 실효성을 그 자리에서 증명함.
+
+**구현:** `utils/api_safety.py`, `pages/1_api_input.py`, `scripts/test_api_safety.py`
