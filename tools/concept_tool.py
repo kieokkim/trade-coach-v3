@@ -4,6 +4,7 @@ from pathlib import Path
 from langchain_core.tools import tool
 
 _CONCEPTS_PATH = Path(__file__).parent / "ict_concepts.json"
+_WEAKNESS_PATH = Path(__file__).parent / "weakness_explanations.json"
 _concepts: dict | None = None
 
 CONCEPT_NOT_FOUND_PREFIX = "해당 개념을 찾을 수 없습니다"
@@ -13,6 +14,8 @@ def _load_concepts() -> dict:
     global _concepts
     if _concepts is None:
         _concepts = json.loads(_CONCEPTS_PATH.read_text(encoding="utf-8"))
+        if _WEAKNESS_PATH.exists():
+            _concepts.update(json.loads(_WEAKNESS_PATH.read_text(encoding="utf-8")))
     return _concepts
 
 
