@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from utils.llm_factory import get_llm
 from nodes.stop_loss_node import analyze_stop_loss
+from tools.ict_rag import search_ict_concept_rag
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,19 @@ def entry_reason_node(
     ob  = ict_patterns.get("ob_zones", [])
     bd  = aplus["breakdown"]
 
+    pattern_context = ""
+    try:
+        if fvg:
+            rag_result = search_ict_concept_rag("가격 공백 FVG 패턴", top_k=1)
+            if rag_result and rag_result[0]["distance"] < 0.5:
+                pattern_context += f"\nFVG 참고: {rag_result[0]['improvement']}"
+        if ob:
+            rag_result = search_ict_concept_rag("기관 주문 구간 OB 패턴", top_k=1)
+            if rag_result and rag_result[0]["distance"] < 0.5:
+                pattern_context += f"\nOB 참고: {rag_result[0]['improvement']}"
+    except Exception as e:
+        logger.warning("entry_reason_node RAG 검색 실패: %s", e)
+
     prompt = (
         f"거래: {trade.get('symbol')} {trade.get('side')} "
         f"진입가:{trade.get('execPrice')} "
@@ -162,6 +176,7 @@ def entry_reason_node(
         f"손절규율{'✅' if bd['stop_discipline'] else '❌'}\n"
         f"캔들(진입전→후): {' | '.join(fmt(c) for c in before + after)}\n"
         f"트레이딩 철학: {TRADING_PHILOSOPHY}\n"
+        f"{pattern_context}\n"
         f"진입 근거 추론(2문장)과 미충족 항목 개선 코칭(2문장)을 한국어로 작성하세요."
     )
 
