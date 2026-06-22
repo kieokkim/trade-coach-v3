@@ -1,0 +1,203 @@
+{
+  "current": {
+    "model": "paraphrase-multilingual-MiniLM-L12-v2",
+    "accuracy": 0.0,
+    "load_time_sec": 10.4,
+    "details": [
+      {
+        "query": "가격 공백이 생겨서 진입했는데 실패했어요",
+        "expected": "FVG",
+        "top1": "유동성스윕",
+        "distance": 0.3831,
+        "top3": [
+          "유동성스윕",
+          "JudasSwing",
+          "OrderBlock"
+        ],
+        "hit": false
+      },
+      {
+        "query": "기관이 대량 주문한 자리에서 반응이 나온다던데",
+        "expected": "OrderBlock",
+        "top1": "유동성스윕",
+        "distance": 0.3997,
+        "top3": [
+          "유동성스윕",
+          "Propulsion Block",
+          "JudasSwing"
+        ],
+        "hit": false
+      },
+      {
+        "query": "런던 시간대에 진입하면 좋다고 들었어요",
+        "expected": "Killzone",
+        "top1": "유동성스윕",
+        "distance": 0.5359,
+        "top3": [
+          "유동성스윕",
+          "Killzone",
+          "JudasSwing"
+        ],
+        "hit": false
+      },
+      {
+        "query": "직전 저점이 깨지는 시점",
+        "expected": "BOS",
+        "top1": "유동성스윕",
+        "distance": 0.3387,
+        "top3": [
+          "유동성스윕",
+          "Propulsion Block",
+          "BOS"
+        ],
+        "hit": false
+      },
+      {
+        "query": "비싼 구간인지 싼 구간인지 봐야 한다던데",
+        "expected": "프리미엄_디스카운트",
+        "top1": "유동성스윕",
+        "distance": 0.4746,
+        "top3": [
+          "유동성스윕",
+          "JudasSwing",
+          "Propulsion Block"
+        ],
+        "hit": false
+      }
+    ]
+  },
+  "e5_large": {
+    "model": "intfloat/multilingual-e5-large",
+    "accuracy": 80.0,
+    "load_time_sec": 183.8,
+    "details": [
+      {
+        "query": "가격 공백이 생겨서 진입했는데 실패했어요",
+        "expected": "FVG",
+        "top1": "FVG",
+        "distance": 0.1455,
+        "top3": [
+          "FVG",
+          "OTE",
+          "프리미엄_디스카운트"
+        ],
+        "hit": true
+      },
+      {
+        "query": "기관이 대량 주문한 자리에서 반응이 나온다던데",
+        "expected": "OrderBlock",
+        "top1": "OrderBlock",
+        "distance": 0.1747,
+        "top3": [
+          "OrderBlock",
+          "AMD",
+          "Killzone"
+        ],
+        "hit": true
+      },
+      {
+        "query": "런던 시간대에 진입하면 좋다고 들었어요",
+        "expected": "Killzone",
+        "top1": "OTE",
+        "distance": 0.1684,
+        "top3": [
+          "OTE",
+          "Killzone",
+          "프리미엄_디스카운트"
+        ],
+        "hit": false
+      },
+      {
+        "query": "직전 저점이 깨지는 시점",
+        "expected": "BOS",
+        "top1": "BOS",
+        "distance": 0.1708,
+        "top3": [
+          "BOS",
+          "프리미엄_디스카운트",
+          "Propulsion Block"
+        ],
+        "hit": true
+      },
+      {
+        "query": "비싼 구간인지 싼 구간인지 봐야 한다던데",
+        "expected": "프리미엄_디스카운트",
+        "top1": "프리미엄_디스카운트",
+        "distance": 0.1268,
+        "top3": [
+          "프리미엄_디스카운트",
+          "FVG",
+          "OTE"
+        ],
+        "hit": true
+      }
+    ]
+  },
+  "bge_m3": {
+    "model": "BAAI/bge-m3",
+    "accuracy": 100.0,
+    "load_time_sec": 75.9,
+    "details": [
+      {
+        "query": "가격 공백이 생겨서 진입했는데 실패했어요",
+        "expected": "FVG",
+        "top1": "FVG",
+        "distance": 0.4274,
+        "top3": [
+          "FVG",
+          "OTE",
+          "NWOG"
+        ],
+        "hit": true
+      },
+      {
+        "query": "기관이 대량 주문한 자리에서 반응이 나온다던데",
+        "expected": "OrderBlock",
+        "top1": "OrderBlock",
+        "distance": 0.4117,
+        "top3": [
+          "OrderBlock",
+          "Killzone",
+          "유동성스윕"
+        ],
+        "hit": true
+      },
+      {
+        "query": "런던 시간대에 진입하면 좋다고 들었어요",
+        "expected": "Killzone",
+        "top1": "Killzone",
+        "distance": 0.5121,
+        "top3": [
+          "Killzone",
+          "NWOG",
+          "프리미엄_디스카운트"
+        ],
+        "hit": true
+      },
+      {
+        "query": "직전 저점이 깨지는 시점",
+        "expected": "BOS",
+        "top1": "BOS",
+        "distance": 0.5007,
+        "top3": [
+          "BOS",
+          "유동성스윕",
+          "MSS"
+        ],
+        "hit": true
+      },
+      {
+        "query": "비싼 구간인지 싼 구간인지 봐야 한다던데",
+        "expected": "프리미엄_디스카운트",
+        "top1": "프리미엄_디스카운트",
+        "distance": 0.3456,
+        "top3": [
+          "프리미엄_디스카운트",
+          "FVG",
+          "OTE"
+        ],
+        "hit": true
+      }
+    ]
+  }
+}
