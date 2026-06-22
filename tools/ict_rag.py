@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 _CHROMA_PATH = Path(__file__).parent.parent / "data" / "chroma_db"
 _CONCEPTS_PATH = Path(__file__).parent / "ict_concepts.json"
-_EMBED_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
+_EMBED_MODEL = "BAAI/bge-m3"
 
 _client = None
 _collection = None
@@ -53,21 +53,29 @@ def build_index(force: bool = False) -> int:
         _collection = None
         collection = _get_collection()
 
+    try:
+        from tools.ict_search_text import ICT_SEARCH_TEXT
+    except ModuleNotFoundError:
+        from ict_search_text import ICT_SEARCH_TEXT
     concepts = json.loads(_CONCEPTS_PATH.read_text(encoding="utf-8"))
 
     ids, documents, metadatas = [], [], []
     for i, (concept_name, info) in enumerate(concepts.items()):
-        definition = info.get("정의", "")
-        key_points = info.get("핵심_포인트", [])
+        doc_text = ICT_SEARCH_TEXT.get(concept_name, "")
+        if not doc_text:
+            definition = info.get("정의", "")
+            key_points = info.get("핵심_포인트", [])
+            mistake = info.get("실수_패턴", "")
+            improvement = info.get("개선_방법", "")
+            doc_text = (
+                f"{concept_name}: {definition}\n"
+                f"핵심 포인트: {' / '.join(key_points)}\n"
+                f"흔한 실수: {mistake}\n"
+                f"개선 방법: {improvement}"
+            )
+
         mistake = info.get("실수_패턴", "")
         improvement = info.get("개선_방법", "")
-
-        doc_text = (
-            f"{concept_name}: {definition}\n"
-            f"핵심 포인트: {' / '.join(key_points)}\n"
-            f"흔한 실수: {mistake}\n"
-            f"개선 방법: {improvement}"
-        )
 
         ids.append(f"concept_{i}")
         documents.append(doc_text)

@@ -462,3 +462,27 @@ entry_reason_node를 그대로 재사용해서 LLM_PROVIDER만 교체. expert �
 **검증:** 실제 본인 .env 키로 테스트한 결과 7개 거래 권한(ContractTrade:Order, Spot:SpotTrade, Options:OptionsTrade, DerivativesTrade, FiatP2POrder 등) 정확히 탐지됨. 이는 실제로 분석 전용 용도에 맞지 않는 키였음을 발견한 것으로, 보안 설계의 실효성을 그 자리에서 증명함.
 
 **구현:** `utils/api_safety.py`, `pages/1_api_input.py`, `scripts/test_api_safety.py`
+
+---
+
+### Decision 33: RAG 임베딩 모델 - bge-m3 채택
+**결정:** ICT 개념 검색 임베딩 모델을 paraphrase-multilingual-MiniLM-L12-v2 → BAAI/bge-m3로 교체
+
+**발견 과정:**
+1. 1차 인덱싱(MiniLM) 직후 모든 질의가 "프리미엄_디스카운트"로 독점됨
+2. 가설 1: 데이터 노이즈(ICT개념+약점태그 혼재) → 분리해도 해결 안 됨
+3. 가설 2: 한국어보다 영어 검색 텍스트가 나을 것 → A/B 검증 결과 한국어 0% / 영어 0%, 둘 다 실패 (언어는 원인이 아니었음)
+4. 진짜 원인: MiniLM 모델 자체가 ICT 도메인 한국어 검색에 부적합
+5. 모델 3종 비교(MiniLM/e5-large/bge-m3) → bge-m3가 정확도 100%, 속도도 e5-large보다 2.4배 빠름
+
+**결과 (5건 기준):**
+| 모델 | 정확도 | 로딩 시간 |
+|------|--------|-----------|
+| MiniLM (기존) | 0% | 10.4s |
+| e5-large | 80% | 183.8s |
+| **bge-m3 (채택)** | **100%** | **75.9s** |
+
+**교훈:**
+"이게 원인일 것이다"는 가설을 순서대로 검증하면서 틀린 가설(데이터 노이즈, 언어 문제)을 하나씩 제거하고 진짜 원인(모델 선택)에 도달함. RAG 품질 문제는 데이터/프롬프트보다 임베딩 모델 선택이 핵심일 수 있음을 확인.
+
+**구현:** `tools/ict_rag.py` (_EMBED_MODEL), `scripts/eval_rag_lang_comparison.py`, `scripts/eval_rag_model_comparison.py`
