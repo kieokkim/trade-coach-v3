@@ -486,3 +486,22 @@ entry_reason_node를 그대로 재사용해서 LLM_PROVIDER만 교체. expert �
 "이게 원인일 것이다"는 가설을 순서대로 검증하면서 틀린 가설(데이터 노이즈, 언어 문제)을 하나씩 제거하고 진짜 원인(모델 선택)에 도달함. RAG 품질 문제는 데이터/프롬프트보다 임베딩 모델 선택이 핵심일 수 있음을 확인.
 
 **구현:** `tools/ict_rag.py` (_EMBED_MODEL), `scripts/eval_rag_lang_comparison.py`, `scripts/eval_rag_model_comparison.py`
+
+---
+
+## 2026-06-23
+
+### Decision 34: 거래소 추상화 레이어 + Upbit 지원 추가
+**결정:** ExchangeClient 추상 인터페이스(fetch_trades, fetch_candles, check_permissions)를 도입해 Bybit 전용 구조를 거래소 독립적으로 일반화하고 Upbit 지원 추가
+
+**구현:**
+- `market/exchange_base.py` — ABC 인터페이스
+- `market/bybit_client.py` — 기존 Bybit 로직 캡슐화
+- `market/upbit_client.py` — Upbit REST API 연동, 응답을 Bybit V5 구조로 정규화해서 기존 파이프라인 재사용
+- `nodes/fetch_nodes.py` — bybit_fetch_node 함수명 유지하되 내부에서 exchange 상태값 기준으로 클라이언트 분기 (graph.py 노드 등록 변경 없이 회귀 위험 최소화)
+- `utils/api_safety.py` — BybitClient.check_permissions()로 위임
+
+**Upbit 권한 확인 방식의 차이:**
+Bybit은 API로 권한 조회가 가능하지만 Upbit은 키 발급 시점에 권한이 고정되는 구조라 별도 조회 API가 없음. 대신 발급 페이지에서 직접 확인하라는 안내 문구로 대체.
+
+**검증:** 거래소 추상화 도입 후 Bybit 샘플 모드 회귀 테스트 (beginner 12쌍 거래 정상 조회) 통과.
