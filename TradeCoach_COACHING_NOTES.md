@@ -1,5 +1,7 @@
 # Coaching Notes — TradeCoach
 
+## 1~2단계 전체 완료 — 다음은 v3.0 로드맵 논의
+
 > 이 파일은 Claude 웹(메모리 보유)에서 받은 전략 코칭을 Claude Code 세션에
 > 전달하기 위한 동기화 파일입니다. 새 세션 시작 시 CLAUDE.md, DECISION_LOG.md와
 > 함께 읽어주세요.
@@ -108,40 +110,27 @@ Ground Truth로 활용. 사람이 매번 차트를 보고 판단하는 대신,
 
 ---
 
-## 다음 작업 우선순위 (2단계 — 미들레벨 자격요건, 작업량 많음) ← 지금부터 시작
+## ✅ 2단계 완료 (2026-06)
 
-### 4. RAG 레이어 추가
+### 4. RAG 레이어 (✅ 완료)
 
-```
-목적: ICT 개념 사전(tools/ict_concepts.json, 25개)을
-     단순 JSON lookup에서 vector 검색 기반으로 업그레이드
-작업:
-  1. ChromaDB에 ICT 개념 임베딩
-  2. 트레이더의 실수 패턴을 자연어로 질의 → 유사 개념 검색
-  3. 검색된 개념을 LLM 코칭에 활용
-  4. 청킹 전략, 임베딩 모델 선택 이유를 문서화
-  5. 검색 정확도 검증 (eval)
-이미 있는 재료: tools/ict_concepts.json (25개 개념)
-```
+결과: 4단계 가설 검증으로 임베딩 모델 한계 발견
+(MiniLM 0% → bge-m3 100%). entry_reason_node 코칭에 연결 완료.
 
-### 5. FastAPI 백엔드 분리
+산출물: tools/ict_rag.py, tools/ict_search_text.py, Decision 33
 
-```
-목적: Streamlit(데모용)에서 벗어나 실무 표준 구조로 전환
-작업:
-  1. 기존 LangGraph 파이프라인을 FastAPI 엔드포인트로 감싸기
-  2. Streamlit UI → FastAPI 호출 구조로 변경
-  3. 프론트/백엔드 분리 아키텍처 경험 확보
-```
+### 5. FastAPI 백엔드 분리 (✅ 완료)
 
-### 6. Observability (Langfuse 연동)
+결과: /analyze, /replay/candles, /replay/aplus 4개 엔드포인트.
+실시간 노드 로그는 의도적으로 포기, 구조 분리를 우선시.
 
-```
-목적: 각 LLM 노드의 비용/지연시간을 추적·모니터링
-작업:
-  1. backtest_coach, quiz_generate 같은 LLM 노드에 Langfuse 연동
-  2. 비용 최적화 데이터를 포트폴리오 수치로 활용
-```
+산출물: api/main.py, Decision 35
+
+### 6. Observability (✅ 완료)
+
+결과: Langfuse lazy import 설계 — 키 없으면 기존 동작 100% 유지.
+
+산출물: utils/observability.py, Decision 36
 
 ---
 
