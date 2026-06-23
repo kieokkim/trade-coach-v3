@@ -4,6 +4,7 @@ import time
 import requests
 
 API_BASE = "http://localhost:8000"
+SESSION_ID = f"integration_test_{int(time.time())}"
 
 
 def wait_for_server(timeout=10):
@@ -25,7 +26,7 @@ def test_health():
 
 def test_analyze():
     resp = requests.post(f"{API_BASE}/analyze", json={
-        "session_id": "integration_test",
+        "session_id": SESSION_ID,
         "sample_mode": "beginner",
     }, timeout=120)
     assert resp.status_code == 200, f"analyze failed: {resp.text}"

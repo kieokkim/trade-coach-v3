@@ -1,7 +1,10 @@
 import logging
+import os
+import time
 from datetime import datetime, timezone
 
 from utils.llm_factory import get_llm
+from utils.observability import trace_llm_call
 from nodes.stop_loss_node import analyze_stop_loss
 from tools.ict_rag import search_ict_concept_rag
 
@@ -182,10 +185,20 @@ def entry_reason_node(
 
     try:
         llm = get_llm(task="complex", temperature=0.3).bind(max_tokens=350)
+        _start = time.time()
         resp = llm.invoke([{"role": "user", "content": prompt}])
+        _elapsed = time.time() - _start
         parts = resp.content.strip().split("\n\n", 1)
         reason   = parts[0].strip()
         coaching = parts[1].strip() if len(parts) > 1 else ""
+        trace_llm_call(
+            node_name="entry_reason_node",
+            input_text=prompt,
+            output_text=resp.content,
+            model=os.getenv("LLM_PROVIDER", "openai"),
+            elapsed=_elapsed,
+            session_id=session_id,
+        )
     except Exception as e:
         logger.warning("entry_reason_node LLM error: %s", e)
         reason   = f"{'FVG' if fvg else 'OB' if ob else '불명확한 구조'}에서 진입한 것으로 추정됩니다."

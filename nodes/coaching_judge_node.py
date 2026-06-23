@@ -1,8 +1,11 @@
 import json
 import logging
+import os
 import re
+import time
 
 from utils.llm_factory import get_llm
+from utils.observability import trace_llm_call
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +49,22 @@ def coaching_judge_node(state: dict) -> dict:
         checklist=PHILOSOPHY_CHECKLIST,
     )
 
+    session_id = state.get("session_id", "default")
     try:
         llm = get_llm(task="default", temperature=0).bind(max_tokens=300)
+        _start = time.time()
         resp = llm.invoke([{"role": "user", "content": prompt}])
+        _elapsed = time.time() - _start
         text = re.sub(r"```json|```", "", resp.content.strip()).strip()
         result = json.loads(text)
+        trace_llm_call(
+            node_name="coaching_judge_node",
+            input_text=prompt,
+            output_text=resp.content,
+            model=os.getenv("LLM_PROVIDER", "openai"),
+            elapsed=_elapsed,
+            session_id=session_id,
+        )
         logger.info(
             "coaching_judge_node: passed=%s scores=%s",
             result.get("passed"), result.get("scores"),

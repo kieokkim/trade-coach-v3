@@ -521,3 +521,15 @@ graph.stream()의 노드별 실시간 UI 업데이트를 API 단순 호출(동�
 os.environ 조작(TC_SAMPLE_FILE, BYBIT_API_KEY 임시 제거/복원) 코드 완전 제거. 상태 관리 책임이 Streamlit에서 API 서버로 명확히 이전됨.
 
 **검증:** `scripts/test_api_integration.py`로 4개 엔드포인트 전체 통합 테스트 통과 (13노드/24거래, 50캔들/8FVG/17OB, A+ 4/5).
+
+### Decision 36: Observability - Langfuse 연동
+**결정:** entry_reason_node, coaching_judge_node의 LLM 호출에 Langfuse trace 추가. 키 미설정 시 조용히 비활성화되어 기존 동작 영향 없음.
+
+**목적:** 운영 중 LLM 비용/지연시간 추적, 멀티모델 비교(Decision 31) 결과를 실제 프로덕션 데이터로 지속 검증할 수 있는 기반 마련.
+
+**구현:**
+- `utils/observability.py` — `get_langfuse()` 싱글턴 + `trace_llm_call()` 헬퍼
+- `nodes/entry_reason_node.py` — LLM 호출 시간 측정 + trace
+- `nodes/coaching_judge_node.py` — 동일 패턴 적용
+
+**설계 원칙:** Langfuse 키 없으면 import도 하지 않음 (lazy import). 운영 환경에서 langfuse 패키지 없어도 에러 없음.
