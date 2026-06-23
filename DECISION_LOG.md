@@ -505,3 +505,19 @@ entry_reason_node를 그대로 재사용해서 LLM_PROVIDER만 교체. expert �
 Bybit은 API로 권한 조회가 가능하지만 Upbit은 키 발급 시점에 권한이 고정되는 구조라 별도 조회 API가 없음. 대신 발급 페이지에서 직접 확인하라는 안내 문구로 대체.
 
 **검증:** 거래소 추상화 도입 후 Bybit 샘플 모드 회귀 테스트 (beginner 12쌍 거래 정상 조회) 통과.
+
+### Decision 35: FastAPI 백엔드 분리
+**결정:** Streamlit이 LangGraph 파이프라인을 직접 호출하던 구조를 FastAPI 엔드포인트로 분리. 프론트엔드/백엔드 책임 경계 명확화.
+
+**구현:**
+- `api/main.py` — `/health`, `/analyze`, `/replay/candles`, `/replay/aplus`
+- `pages/2_loading.py`, `pages/3_main.py` — requests 기반 API 클라이언트로 전환
+- `replay_coach_node`, `validate_price_in_candle`은 API화하지 않고 직접 호출 유지 (자주 쓰이는 핵심 흐름만 분리, 과도한 추상화 지양)
+
+**트레이드오프 — 실시간 노드 로그 포기:**
+graph.stream()의 노드별 실시간 UI 업데이트를 API 단순 호출(동기, 일괄 응답)로 전환하면서 실시간성을 의도적으로 희생. 이유: 채용 시장에서 "프론트/백엔드 분리 설계 능력"이 "실시간 UX"보다 더 직접적인 차별화 신호로 판단. 필요 시 SSE/WebSocket으로 향후 업그레이드 가능하도록 구조 분리만 먼저 확보.
+
+**부수 효과:**
+os.environ 조작(TC_SAMPLE_FILE, BYBIT_API_KEY 임시 제거/복원) 코드 완전 제거. 상태 관리 책임이 Streamlit에서 API 서버로 명확히 이전됨.
+
+**검증:** `scripts/test_api_integration.py`로 4개 엔드포인트 전체 통합 테스트 통과 (13노드/24거래, 50캔들/8FVG/17OB, A+ 4/5).
