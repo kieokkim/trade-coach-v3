@@ -2929,6 +2929,20 @@ wheels = [
 ]
 
 [[package]]
+name = "pyupbit"
+version = "0.2.34"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pandas" },
+    { name = "pyjwt" },
+    { name = "requests" },
+    { name = "websockets" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a9/00/28a01fc249c15fa9b7479f57af402036d1425cc82f05b3d4c2ec98c1e373/pyupbit-0.2.34-py3-none-any.whl", hash = "sha256:793d14ef3811bd8756aa3fd10a22ce9c92bcadd31d4d32119859fa0a2110c7d9", size = 24858, upload-time = "2024-06-14T16:21:46.575Z" },
+]
+
+[[package]]
 name = "pyyaml"
 version = "6.0.3"
 source = { registry = "https://pypi.org/simple" }
@@ -3694,6 +3708,7 @@ dependencies = [
     { name = "plotly" },
     { name = "pybit" },
     { name = "python-dotenv" },
+    { name = "pyupbit" },
     { name = "requests" },
     { name = "sentence-transformers" },
     { name = "streamlit" },
@@ -3717,6 +3732,7 @@ requires-dist = [
     { name = "plotly", specifier = ">=6.7.0" },
     { name = "pybit", specifier = ">=5.16.0" },
     { name = "python-dotenv", specifier = "==1.1.1" },
+    { name = "pyupbit", specifier = ">=0.2.34" },
     { name = "requests", specifier = ">=2.33.1" },
     { name = "sentence-transformers", specifier = ">=5.6.0" },
     { name = "streamlit", specifier = ">=1.57.0" },

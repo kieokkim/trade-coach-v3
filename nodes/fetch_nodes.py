@@ -1,13 +1,11 @@
-import hashlib
-import hmac
 import json
 import logging
 import os
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import requests
+from market.bybit_client import BybitClient
+from market.upbit_client import UpbitClient
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +18,6 @@ SAMPLE_FILE_MAP = {
 }
 
 _ROOT = Path(__file__).parent.parent
-_BYBIT_EXEC_URL = "https://api.bybit.com/v5/execution/list"
 
 
 def _sample_path(sample_mode: str) -> Path:
@@ -35,8 +32,12 @@ def new_data_check_node(state: dict) -> dict:
         logger.info("new_data_check_node: journal mode, skip bybit | session_id=%s", session_id)
         return {"has_new_data": False}
 
-    api_key = os.getenv("BYBIT_API_KEY", "")
-    if not api_key:
+    exchange = state.get("exchange", "Bybit")
+    has_api_key = (
+        bool(os.getenv("UPBIT_ACCESS_KEY", "")) if exchange == "Upbit"
+        else bool(os.getenv("BYBIT_API_KEY", ""))
+    )
+    if not has_api_key:
         logger.info("new_data_check_node: sample mode → has_new_data=True | session_id=%s", session_id)
         return {"has_new_data": True}
 
@@ -68,59 +69,39 @@ def new_data_check_node(state: dict) -> dict:
         return {"has_new_data": True}
 
 
-def bybit_fetch_node(state: dict) -> dict:
-    session_id = state.get("session_id", "default")
+def _get_exchange_client(state: dict):
+    exchange = state.get("exchange", "Bybit")
+    if exchange == "Upbit":
+        access_key = os.getenv("UPBIT_ACCESS_KEY", "")
+        secret_key = os.getenv("UPBIT_SECRET_KEY", "")
+        if access_key and secret_key:
+            return UpbitClient(access_key, secret_key)
+        return None
+
     api_key = os.getenv("BYBIT_API_KEY", "")
     api_secret = os.getenv("BYBIT_API_SECRET", "")
+    if api_key and api_secret:
+        return BybitClient(api_key, api_secret)
+    return None
 
+
+def bybit_fetch_node(state: dict) -> dict:
+    session_id = state.get("session_id", "default")
     sample_mode = state.get("sample_mode", "sample_1")
     path = _sample_path(sample_mode)
 
     trades = []
-    if api_key and api_secret:
-        trades = _fetch_from_api(api_key, api_secret, path)
+    client = _get_exchange_client(state)
+    if client:
+        trades = client.fetch_trades()
 
     if not trades:
-        logger.info("bybit_fetch_node: no trades from API, loading sample | mode=%s", sample_mode)
+        logger.info("exchange_fetch: no trades from API, loading sample | mode=%s", sample_mode)
         trades = _load_sample(path)
 
     now = datetime.now(tz=timezone.utc).isoformat()
-    logger.info("bybit_fetch_node end | session_id=%s trades=%d", session_id, len(trades))
+    logger.info("exchange_fetch end | session_id=%s trades=%d", session_id, len(trades))
     return {"raw_trades": trades, "last_fetched_at": now}
-
-
-def _fetch_from_api(api_key: str, api_secret: str, fallback_path: Path) -> list[dict]:
-    timestamp = str(int(time.time() * 1000))
-    recv_window = "5000"
-    query_str = "category=linear&limit=50"
-    sign_payload = f"{timestamp}{api_key}{recv_window}{query_str}"
-    signature = hmac.new(
-        api_secret.encode("utf-8"),
-        sign_payload.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-    headers = {
-        "X-BAPI-API-KEY": api_key,
-        "X-BAPI-SIGN": signature,
-        "X-BAPI-TIMESTAMP": timestamp,
-        "X-BAPI-RECV-WINDOW": recv_window,
-    }
-
-    try:
-        resp = requests.get(
-            _BYBIT_EXEC_URL,
-            params={"category": "linear", "limit": 50},
-            headers=headers,
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        logger.info("bybit_fetch_node: API response retCode=%s", data.get("retCode"))
-        return data.get("result", {}).get("list", [])
-    except Exception as e:
-        logger.warning("bybit_fetch_node: API call failed: %s, falling back to sample", e)
-        return _load_sample(fallback_path)
 
 
 def _load_sample(path: Path) -> list[dict]:

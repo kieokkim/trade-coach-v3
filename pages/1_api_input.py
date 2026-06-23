@@ -2,7 +2,8 @@ import os
 
 import streamlit as st
 
-from utils.api_safety import check_api_permissions
+from market.bybit_client import BybitClient
+from market.upbit_client import UpbitClient
 from utils.styles import inject_global_css, render_sidebar_brand
 
 st.set_page_config(page_title="TradeCoach | API 연결", page_icon="🔑", layout="centered")
@@ -64,21 +65,43 @@ st.markdown("""
 
 st.divider()
 
-st.subheader("🔑 Bybit API 연결")
+st.subheader("🔑 거래소 API 연결")
 st.caption("API 키는 브라우저 세션에만 임시 저장됩니다.")
 
-with st.form("api_form"):
-    api_key = st.text_input("API Key", type="password", placeholder="Bybit API Key")
-    api_secret = st.text_input("API Secret", type="password", placeholder="Bybit API Secret")
-    submitted = st.form_submit_button("🔗 연결 확인", type="primary", use_container_width=True)
+exchange = st.radio("거래소 선택", ["Bybit", "Upbit"], horizontal=True)
+
+if exchange == "Bybit":
+    with st.form("api_form"):
+        api_key = st.text_input("API Key", type="password", placeholder="Bybit API Key")
+        api_secret = st.text_input("API Secret", type="password", placeholder="Bybit API Secret")
+        submitted = st.form_submit_button("🔗 연결 확인", type="primary", use_container_width=True)
+else:
+    with st.form("api_form"):
+        api_key = st.text_input("Access Key", type="password", placeholder="Upbit Access Key")
+        api_secret = st.text_input("Secret Key", type="password", placeholder="Upbit Secret Key")
+        submitted = st.form_submit_button("🔗 연결 확인", type="primary", use_container_width=True)
 
 if submitted:
     if api_key.strip() and api_secret.strip():
+        if exchange == "Bybit":
+            client = BybitClient(api_key.strip(), api_secret.strip())
+        else:
+            client = UpbitClient(api_key.strip(), api_secret.strip())
+
         with st.spinner("API 키 권한 확인 중..."):
-            perm_check = check_api_permissions(api_key.strip(), api_secret.strip())
+            perm_check = client.check_permissions()
 
         if not perm_check["valid"]:
             st.error(perm_check["warning"])
+        elif perm_check.get("read_only") is None:
+            os.environ["UPBIT_ACCESS_KEY"] = api_key.strip()
+            os.environ["UPBIT_SECRET_KEY"] = api_secret.strip()
+            st.session_state["exchange"] = exchange
+            st.session_state["api_ready"] = True
+            st.session_state.pop("sample_mode", None)
+            st.info(perm_check["warning"])
+            st.success("✅ Upbit 연결 완료")
+            st.switch_page("pages/2_loading.py")
         elif not perm_check["read_only"]:
             st.warning(perm_check["warning"])
             st.caption(
@@ -88,9 +111,11 @@ if submitted:
             st.session_state["api_perm_warning"] = True
             st.session_state["api_key_pending"] = api_key.strip()
             st.session_state["api_secret_pending"] = api_secret.strip()
+            st.session_state["exchange_pending"] = exchange
         else:
             os.environ["BYBIT_API_KEY"] = api_key.strip()
             os.environ["BYBIT_API_SECRET"] = api_secret.strip()
+            st.session_state["exchange"] = exchange
             st.session_state["api_ready"] = True
             st.session_state.pop("sample_mode", None)
             st.success("✅ 연결 확인 완료 (read-only 키 확인됨)")
@@ -100,13 +125,20 @@ if submitted:
 
 if st.session_state.get("api_perm_warning"):
     if st.checkbox("권한 경고를 확인했으며 계속 진행합니다"):
-        os.environ["BYBIT_API_KEY"] = st.session_state["api_key_pending"]
-        os.environ["BYBIT_API_SECRET"] = st.session_state["api_secret_pending"]
+        pending_exchange = st.session_state.get("exchange_pending", "Bybit")
+        if pending_exchange == "Bybit":
+            os.environ["BYBIT_API_KEY"] = st.session_state["api_key_pending"]
+            os.environ["BYBIT_API_SECRET"] = st.session_state["api_secret_pending"]
+        else:
+            os.environ["UPBIT_ACCESS_KEY"] = st.session_state["api_key_pending"]
+            os.environ["UPBIT_SECRET_KEY"] = st.session_state["api_secret_pending"]
+        st.session_state["exchange"] = pending_exchange
         st.session_state["api_ready"] = True
         st.session_state.pop("sample_mode", None)
         st.session_state.pop("api_perm_warning", None)
         st.session_state.pop("api_key_pending", None)
         st.session_state.pop("api_secret_pending", None)
+        st.session_state.pop("exchange_pending", None)
         st.success("✅ 연결 확인 완료 (거래 권한 있는 키 - 주의)")
         st.switch_page("pages/2_loading.py")
 

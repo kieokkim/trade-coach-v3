@@ -48,6 +48,7 @@ class TradeCoachState(TypedDict, total=False):
     judge_result:    str          # 철학 검수 피드백
     judge_passed:    bool         # 철학 기준 통과 여부
     judge_scores:    dict         # 항목별 pass/fail
+    exchange:        str          # 'Bybit' | 'Upbit'
     sample_mode:     str          # 'sample_1'|'sample_2'|'beginner'|'intermediate'|'expert'
     progress_comparison: dict     # 세션 간 약점 변화 비교
 
@@ -70,6 +71,7 @@ DEFAULT_STATE: TradeCoachState = {
     "avg_return_rate":   0.0,
     "expected_value":    0.0,
     "loss_consistency":  0.0,
+    "exchange":          "Bybit",
     "concept_not_found": False,
     "last_fetched_at":   "",
     "has_new_data":      False,

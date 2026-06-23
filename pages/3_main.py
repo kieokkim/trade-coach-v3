@@ -283,6 +283,7 @@ else:
                     symbol, entry_ms, interval="15", limit=50,
                     order_id=order_id,
                     sample_mode=st.session_state.get("sample_mode", ""),
+                    exchange=st.session_state.get("exchange", "Bybit"),
                 )
 
     if st.session_state.get("replay_open"):
@@ -292,6 +293,7 @@ else:
                     symbol, entry_ms, interval="15", limit=50,
                     order_id=order_id,
                     sample_mode=st.session_state.get("sample_mode", ""),
+                    exchange=st.session_state.get("exchange", "Bybit"),
                 )
         candles = st.session_state[cache_key]
         fvgs    = detect_fvg(candles)

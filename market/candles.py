@@ -1,9 +1,11 @@
 import json
 import logging
+import os
 import random
 from pathlib import Path
 
-from pybit.unified_trading import HTTP
+from market.bybit_client import BybitClient
+from market.upbit_client import UpbitClient
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +95,7 @@ def get_candles(
     limit: int = 50,
     order_id: str | None = None,
     sample_mode: str | bool = False,
+    exchange: str = "Bybit",
 ) -> list[dict]:
     if sample_mode and order_id:
         mode_key = sample_mode if isinstance(sample_mode, str) else "sample_1"
@@ -104,31 +107,27 @@ def get_candles(
         return _generate_dummy_candles(entry_time_ms, limit, interval)
 
     start = entry_time_ms - (int(interval) * 60 * 1000 * (limit // 2))
-    session = HTTP(testnet=False)
-    logger.info("Fetching kline: symbol=%s interval=%s limit=%d start=%d", symbol, interval, limit, start)
+    logger.info("Fetching kline: symbol=%s interval=%s limit=%d start=%d exchange=%s",
+                symbol, interval, limit, start, exchange)
 
-    try:
-        response = session.get_kline(
-            category="linear",
-            symbol=symbol,
-            interval=interval,
-            start=start,
-            limit=limit,
-        )
-        candles = [
-            {
-                "timestamp": int(c[0]),
-                "open": float(c[1]),
-                "high": float(c[2]),
-                "low": float(c[3]),
-                "close": float(c[4]),
-                "volume": float(c[5]),
-            }
-            for c in response["result"]["list"]
-        ]
-        candles.sort(key=lambda x: x["timestamp"])
-        logger.info("Retrieved %d candles for %s", len(candles), symbol)
-        return candles
-    except Exception as e:
-        logger.warning("get_candles: API failed: %s", e)
-        return _generate_dummy_candles(entry_time_ms, limit, interval)
+    client = _get_candle_client(exchange)
+    if client:
+        candles = client.fetch_candles(symbol, interval, start, limit)
+        if candles:
+            return candles
+
+    return _generate_dummy_candles(entry_time_ms, limit, interval)
+
+
+def _get_candle_client(exchange: str):
+    if exchange == "Upbit":
+        access_key = os.getenv("UPBIT_ACCESS_KEY", "")
+        secret_key = os.getenv("UPBIT_SECRET_KEY", "")
+        if access_key and secret_key:
+            return UpbitClient(access_key, secret_key)
+        return UpbitClient("", "")
+
+    return BybitClient(
+        os.getenv("BYBIT_API_KEY", ""),
+        os.getenv("BYBIT_API_SECRET", ""),
+    )
