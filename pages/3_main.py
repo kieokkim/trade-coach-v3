@@ -29,16 +29,16 @@ _COL_KO = {
     "closedPnl": "손익(USDT)",
 }
 
+import requests
+
 from nodes.replay_coach_node import replay_coach_node
-from nodes.entry_reason_node import entry_reason_node
-from ict.fvg_detector import detect_fvg
-from ict.ob_detector import detect_ob
-from ict.trend_detector import detect_trendline
-from market.candles import get_candles, validate_price_in_candle
+from market.candles import validate_price_in_candle
 from db import save_trade_tag, load_trade_tags, get_setting, save_setting
 from utils.styles import (inject_global_css, render_sidebar_brand,
                            render_dashboard_header, render_kpi_cards,
                            render_trade_table, render_section_header)
+
+API_BASE = "http://localhost:8000"
 
 st.set_page_config(page_title="TradeCoach | 대시보드", page_icon="📊", layout="wide")
 
@@ -275,30 +275,40 @@ else:
     order_id = buy_t.get("orderId", "")
     cache_key = f"replay_{order_id or str(entry_ms)}"
 
+    def _fetch_replay_data():
+        resp = requests.post(f"{API_BASE}/replay/candles", json={
+            "symbol": symbol,
+            "entry_time_ms": entry_ms,
+            "order_id": order_id,
+            "sample_mode": st.session_state.get("sample_mode", ""),
+            "exchange": st.session_state.get("exchange", "Bybit"),
+        }, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+
     if st.button("▶ 복기 시작", key="btn_replay_start"):
         st.session_state["replay_open"] = True
         if cache_key not in st.session_state:
             with st.spinner("캔들 데이터 수집 중..."):
-                st.session_state[cache_key] = get_candles(
-                    symbol, entry_ms, interval="15", limit=50,
-                    order_id=order_id,
-                    sample_mode=st.session_state.get("sample_mode", ""),
-                    exchange=st.session_state.get("exchange", "Bybit"),
-                )
+                try:
+                    st.session_state[cache_key] = _fetch_replay_data()
+                except requests.ConnectionError:
+                    st.error("⚠️ API 서버에 연결할 수 없습니다. `uv run python api/main.py`로 서버를 실행해주세요.")
+                    st.stop()
 
     if st.session_state.get("replay_open"):
         if cache_key not in st.session_state:
             with st.spinner("캔들 데이터 수집 중..."):
-                st.session_state[cache_key] = get_candles(
-                    symbol, entry_ms, interval="15", limit=50,
-                    order_id=order_id,
-                    sample_mode=st.session_state.get("sample_mode", ""),
-                    exchange=st.session_state.get("exchange", "Bybit"),
-                )
-        candles = st.session_state[cache_key]
-        fvgs    = detect_fvg(candles)
-        obs     = detect_ob(candles)
-        tl      = detect_trendline(candles)
+                try:
+                    st.session_state[cache_key] = _fetch_replay_data()
+                except requests.ConnectionError:
+                    st.error("⚠️ API 서버에 연결할 수 없습니다. `uv run python api/main.py`로 서버를 실행해주세요.")
+                    st.stop()
+        replay_data = st.session_state[cache_key]
+        candles = replay_data["candles"]
+        fvgs    = replay_data["fvg_zones"]
+        obs     = replay_data["ob_zones"]
+        tl      = replay_data["trend_info"]
 
         # ── 손절가 입력 ──
         st.divider()
@@ -430,21 +440,24 @@ else:
                      help="손절가와 고정 손실 금액 입력 후 채점하세요"):
             with st.spinner("A+ 채점 중..."):
                 try:
-                    st.session_state[cache_key_aplus] = entry_reason_node(
-                        candles=candles,
-                        ict_patterns={"fvg_zones": fvgs, "ob_zones": obs, "trend_info": tl},
-                        trade={
-                            "symbol":    symbol,
-                            "side":      buy_t.get("side", ""),
-                            "direction": _direction,
-                            "execPrice": buy_t.get("execPrice", 0),
-                            "exitPrice": sell_t.get("execPrice", 0),
-                            "execTime":  buy_t.get("execTime", 0),
-                            "closedPnl": sell_t.get("closedPnl", 0),
-                            "stop_price": stop_price,
-                        },
-                        session_id=session_id,
-                    )
+                    aplus_resp = requests.post(f"{API_BASE}/replay/aplus", json={
+                        "symbol": symbol,
+                        "side": buy_t.get("side", ""),
+                        "direction": _direction,
+                        "execPrice": float(buy_t.get("execPrice", 0)),
+                        "exitPrice": float(sell_t.get("execPrice", 0)),
+                        "execTime": int(buy_t.get("execTime", 0)),
+                        "closedPnl": float(sell_t.get("closedPnl", 0)),
+                        "stop_price": stop_price,
+                        "session_id": session_id,
+                        "sample_mode": st.session_state.get("sample_mode", ""),
+                        "exchange": st.session_state.get("exchange", "Bybit"),
+                    }, timeout=30)
+                    aplus_resp.raise_for_status()
+                    st.session_state[cache_key_aplus] = aplus_resp.json()
+                except requests.ConnectionError:
+                    st.error("⚠️ API 서버에 연결할 수 없습니다.")
+                    st.session_state[cache_key_aplus] = None
                 except Exception:
                     st.session_state[cache_key_aplus] = None
 
