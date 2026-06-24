@@ -522,6 +522,21 @@ os.environ 조작(TC_SAMPLE_FILE, BYBIT_API_KEY 임시 제거/복원) 코드 완
 
 **검증:** `scripts/test_api_integration.py`로 4개 엔드포인트 전체 통합 테스트 통과 (13노드/24거래, 50캔들/8FVG/17OB, A+ 4/5).
 
+### Decision 37: 샘플 모드 우선순위 버그 수정
+**결정:** sample_mode가 명시적으로 선택되면 API 키 존재 여부와 무관하게 항상 우선 적용
+
+**발견 과정:**
+1. 실제 사용 테스트 중 "중급 트레이더 데모" 선택 시 승률 0.0%, 거래내역 없음으로 표시되는 문제 발견
+2. API 직접 호출로 디버깅 → curl 테스트에서는 정상, session_id='default'로 호출했을 때만 빈 결과
+3. new_data_check_node가 completed_nodes 2개에서 멈춤 (memory_load, new_data_check) → has_new_data=False
+4. 근본 원인: .env에 실거래 BYBIT_API_KEY가 들어있어서, 사용자가 sample_mode를 선택해도 has_api_key=True로 판단해 실거래 모드로 강제 전환됨
+
+**수정:**
+- new_data_check_node: sample_mode 체크를 API 키 체크보다 먼저 수행
+- bybit_fetch_node: sample_mode 있으면 거래소 클라이언트 호출 자체를 스킵
+
+**교훈:** 사용자의 명시적 선택(UI에서 고른 모드)이 시스템 설정(.env의 키 존재 여부)보다 항상 우선해야 한다는 원칙을 코드로 강제. 이 버그는 .env에 실제 키를 넣어두는 사용자가 적어 v2.0부터 잠재해 있었지만 오늘 처음 발견됨.
+
 ### Decision 36: Observability - Langfuse 연동
 **결정:** entry_reason_node, coaching_judge_node의 LLM 호출에 Langfuse trace 추가. 키 미설정 시 조용히 비활성화되어 기존 동작 영향 없음.
 
