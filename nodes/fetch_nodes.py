@@ -32,13 +32,22 @@ def new_data_check_node(state: dict) -> dict:
         logger.info("new_data_check_node: journal mode, skip bybit | session_id=%s", session_id)
         return {"has_new_data": False}
 
+    # 사용자의 명시적 샘플 모드 선택은 API 키 존재 여부보다 우선
+    sample_mode = state.get("sample_mode", "")
+    if sample_mode:
+        logger.info(
+            "new_data_check_node: sample_mode=%s 명시적 선택 → has_new_data=True | session_id=%s",
+            sample_mode, session_id,
+        )
+        return {"has_new_data": True}
+
     exchange = state.get("exchange", "Bybit")
     has_api_key = (
         bool(os.getenv("UPBIT_ACCESS_KEY", "")) if exchange == "Upbit"
         else bool(os.getenv("BYBIT_API_KEY", ""))
     )
     if not has_api_key:
-        logger.info("new_data_check_node: sample mode → has_new_data=True | session_id=%s", session_id)
+        logger.info("new_data_check_node: no API key → has_new_data=True | session_id=%s", session_id)
         return {"has_new_data": True}
 
     last_fetched_at = state.get("last_fetched_at", "")
@@ -87,16 +96,17 @@ def _get_exchange_client(state: dict):
 
 def bybit_fetch_node(state: dict) -> dict:
     session_id = state.get("session_id", "default")
-    sample_mode = state.get("sample_mode", "sample_1")
-    path = _sample_path(sample_mode)
+    sample_mode = state.get("sample_mode", "")
 
     trades = []
-    client = _get_exchange_client(state)
-    if client:
-        trades = client.fetch_trades()
+    if not sample_mode:
+        client = _get_exchange_client(state)
+        if client:
+            trades = client.fetch_trades()
 
     if not trades:
-        logger.info("exchange_fetch: no trades from API, loading sample | mode=%s", sample_mode)
+        logger.info("exchange_fetch: loading sample | mode=%s", sample_mode or "sample_1")
+        path = _sample_path(sample_mode or "sample_1")
         trades = _load_sample(path)
 
     now = datetime.now(tz=timezone.utc).isoformat()
