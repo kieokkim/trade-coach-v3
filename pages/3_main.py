@@ -206,6 +206,15 @@ if trade_pairs:
         })
     render_trade_table(trade_list)
 elif raw_trades:
+    _has_buy_only = all(
+        str(t.get("side", "")).lower() == "buy" for t in raw_trades
+    )
+    if _has_buy_only:
+        st.info(
+            f"📦 매수 거래 {len(raw_trades)}건이 있지만 "
+            f"아직 매도(청산)되지 않았습니다. "
+            f"청산 후 복기 분석이 가능합니다."
+        )
     df_trades = pd.DataFrame(raw_trades)
     display_cols = [c for c in ["execTime", "symbol", "side", "execPrice", "orderQty", "closedPnl"]
                     if c in df_trades.columns]
