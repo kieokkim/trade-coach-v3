@@ -87,15 +87,17 @@ if st.sidebar.button("🔄 새 분석 시작", use_container_width=True):
         del st.session_state[key]
     st.switch_page("pages/1_api_input.py")
 
-if st.sidebar.button(
-    "📈 신규 거래 추가 확인",
-    use_container_width=True,
-    help="샘플 #2로 재분석 — 신규 거래 3건 추가된 버전",
-):
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    st.session_state["sample_mode"] = "sample_2"
-    st.switch_page("pages/2_loading.py")
+_current_sample = st.session_state.get("sample_mode", "")
+if _current_sample in ("sample_1", "sample_2"):
+    if st.sidebar.button(
+        "📈 신규 거래 추가 확인",
+        use_container_width=True,
+        help="샘플 #2로 재분석 — 신규 거래 3건 추가된 버전",
+    ):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.session_state["sample_mode"] = "sample_2"
+        st.switch_page("pages/2_loading.py")
 
 st.sidebar.caption("💡 매일 거래 후 새 분석을 시작하세요")
 st.sidebar.divider()
