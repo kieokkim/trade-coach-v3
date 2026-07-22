@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>TradeCoach — Trade Context Viewer v3</title>
+<style>
+:root{
+  --bg:#0B0E14; --bg-panel:#12151F; --bg-panel-2:#161A26; --chart-bg:#08090C;
+  --border:#242938; --border-soft:#1B2030;
+  --text:#EDEAE2; --text-dim:#8B93A3; --text-faint:#5C6478;
+  --up:#22B8A0; --down:#F0525F; --unscored:#7B8296;
+  --neutral-line:#C9CDD6; --neutral-fill:rgba(255,255,255,0.06);
+  --killzone:rgba(134,118,201,0.09); --killzone-line:rgba(134,118,201,0.5);
+  --mono:'SF Mono','Consolas','Menlo',monospace;
+  --serif:Georgia,'Iowan Old Style',serif;
+  --sans:-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box;}
+body{ margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.5; }
+.app{ display:grid; grid-template-columns:280px 1fr; min-height:100vh; }
+.mast{ grid-column:1/3; display:flex; align-items:center; justify-content:space-between; padding:16px 28px; border-bottom:1px solid var(--border); }
+.mast-title{ display:flex; align-items:center; gap:10px; }
+.mast-title h1{ font-size:16px; margin:0; font-weight:700; }
+.mast-title .sub{ font-size:11px; color:var(--text-dim); margin-top:2px; }
+.mast-actions{ display:flex; gap:8px; }
+.btn{ font-family:var(--sans); font-size:12.5px; padding:8px 14px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer; }
+.btn:hover{ border-color:var(--text-faint); }
+.btn.ghost{ color:var(--text-dim); }
+
+.side{ border-right:1px solid var(--border); padding:20px 18px; display:flex; flex-direction:column; gap:22px; }
+.side-block h3{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint); margin:0 0 10px 0; font-weight:600; }
+.scope-divider{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; font-size:10.5px; color:var(--text-faint); padding:2px 4px; }
+.scope-divider b{ color:var(--text-dim); }
+.weakness-block{ padding:0 4px; }
+.weakness-block h3{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint); margin:0 0 10px 0; font-weight:600; }
+.tag-row{ display:flex; flex-wrap:wrap; gap:6px; }
+.tag{ font-size:11.5px; padding:5px 9px; border-radius:5px; background:var(--bg-panel-2); border-left:2.5px solid var(--unscored); color:var(--text-dim); }
+.tag.flag{ border-left-color:var(--down); color:#F0C6C9; }
+.verify-badge{ display:inline-flex; align-items:center; gap:4px; font-size:9px; text-transform:uppercase; letter-spacing:.06em; padding:2px 6px; border-radius:3px; font-weight:600; }
+.verify-badge.rule{ background:rgba(34,184,160,0.15); color:var(--up); }
+.verify-badge.llm{ background:rgba(139,147,163,0.12); color:var(--text-dim); }
+.coach-card{ border:1px dashed var(--border-soft); border-radius:8px; padding:14px; background:var(--bg-panel); }
+.coach-card p{ font-family:var(--serif); font-size:14px; line-height:1.65; margin:0; color:#DCD8CC; }
+.principle-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.principle-list li{ font-size:12px; color:var(--text-dim); display:flex; gap:6px; }
+.principle-list li::before{ content:"✓"; color:var(--up); flex-shrink:0; }
+.killzone-note{ font-size:11px; color:var(--text-faint); margin-top:10px; line-height:1.6; }
+.collapsible summary{ cursor:pointer; font-size:12.5px; color:var(--text-dim); list-style:none; }
+.collapsible summary::-webkit-details-marker{ display:none; }
+.collapsible summary::before{ content:"▸ "; }
+.collapsible[open] summary::before{ content:"▾ "; }
+
+.main{ padding:20px 28px; display:flex; flex-direction:column; gap:22px; }
+.kpi-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.kpi-card{ background:var(--bg-panel); border:1px solid var(--border); border-radius:8px; padding:14px 16px; }
+.kpi-card .label{ font-size:11px; color:var(--text-dim); margin-bottom:6px; }
+.kpi-card .value{ font-family:var(--mono); font-size:22px; font-weight:600; }
+.kpi-card .value.neg{ color:var(--down); }
+.kpi-card .foot{ font-size:10px; color:var(--text-faint); margin-top:4px; }
+
+.panel{ background:var(--bg-panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; }
+.panel-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; flex-wrap:wrap; gap:6px; }
+.panel-head h2{ font-size:14.5px; margin:0; }
+.panel-head .sub{ font-size:11px; color:var(--text-dim); }
+
+/* ---------- 복기뷰어 탭 ---------- */
+.viewer-dropzone{ transition:outline .15s, background .15s; outline:2px dashed transparent; outline-offset:-6px; }
+.viewer-dropzone.dragover{ outline-color:var(--up); background:rgba(34,184,160,0.05); }
+.viewer-current{ font-size:11px; color:var(--text-dim); margin-bottom:4px; }
+.viewer-current b{ color:var(--text); font-family:var(--mono); }
+
+/* 거래별 탭 바 (드롭할 때마다 추가) */
+.trade-tabs{ display:flex; gap:4px; margin-bottom:14px; flex-wrap:wrap; min-height:32px; align-items:flex-end; }
+.trade-tab{ display:flex; align-items:center; gap:7px; padding:7px 8px 7px 12px; border-radius:7px 7px 0 0; background:var(--bg-panel-2); border:1px solid var(--border); border-bottom:2px solid transparent; font-size:11.5px; color:var(--text-dim); cursor:pointer; font-family:var(--mono); }
+.trade-tab.active{ background:var(--bg); color:var(--text); border-bottom-color:var(--up); }
+.trade-tab .close{ font-size:13px; line-height:1; color:var(--text-faint); padding:1px 4px; border-radius:3px; font-family:var(--sans); }
+.trade-tab .close:hover{ color:var(--down); background:rgba(240,82,95,0.15); }
+.trade-tab-empty-hint{ font-size:11.5px; color:var(--text-faint); padding:6px 2px; }
+
+.viewer-tabs{ display:flex; gap:2px; border-bottom:1px solid var(--border); margin-bottom:16px; }
+.tab-btn{ padding:9px 16px; font-size:12.5px; color:var(--text-dim); background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; font-family:var(--sans); }
+.tab-btn.active{ color:var(--text); border-bottom-color:var(--up); }
+.tab-btn:hover{ color:var(--text); }
+.tab-panel{ display:none; }
+.tab-panel.active{ display:block; }
+
+.style-legend{ display:flex; gap:16px; flex-wrap:wrap; font-size:10.5px; color:var(--text-dim); margin-bottom:10px; }
+.style-legend .item{ display:flex; align-items:center; gap:6px; }
+.style-legend .swatch{ width:18px; height:10px; display:inline-block; }
+.chart-wrap{ background:var(--chart-bg); border:1px solid var(--border-soft); border-radius:8px; padding:6px; }
+.chart-caption{ font-size:10.5px; color:var(--text-faint); margin-top:8px; line-height:1.6; }
+.empty-state{ display:none; text-align:center; padding:60px 20px; color:var(--text-dim); }
+.empty-state.show{ display:block; }
+.empty-state .big{ font-size:15px; color:var(--text); margin-bottom:8px; }
+.empty-state .small{ font-size:12px; margin-bottom:16px; }
+
+.aplus-rows{ display:flex; flex-direction:column; }
+.aplus-row{ display:grid; grid-template-columns:22px 1fr auto; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid var(--border-soft); }
+.aplus-row:last-child{ border-bottom:none; }
+.aplus-row .title{ font-size:13px; }
+.aplus-row .detail{ font-size:11px; color:var(--text-dim); margin-top:2px; }
+.verdict{ font-family:var(--mono); font-size:11.5px; padding:4px 9px; border-radius:4px; font-weight:600; white-space:nowrap; }
+.verdict.pass{ background:rgba(34,184,160,0.15); color:var(--up); }
+.verdict.fail{ background:rgba(240,82,95,0.15); color:var(--down); }
+.verdict.unscored{ background:rgba(123,130,150,0.15); color:var(--unscored); }
+.aplus-tally{ display:flex; gap:18px; padding:14px 16px; margin-top:4px; border-radius:7px; background:var(--bg-panel-2); font-family:var(--mono); font-size:12.5px; }
+.aplus-tally .pass-n{ color:var(--up); } .aplus-tally .fail-n{ color:var(--down); } .aplus-tally .unscored-n{ color:var(--unscored); }
+.judge-card{ margin-top:14px; border:1px dashed var(--border-soft); border-radius:8px; padding:14px; }
+.judge-card p{ font-family:var(--serif); font-size:13.5px; color:#DCD8CC; margin:8px 0 0 0; line-height:1.6; }
+.judge-card .caution{ font-size:10.5px; color:var(--down); margin-top:8px; }
+
+.detect-row{ display:flex; gap:24px; margin-bottom:16px; }
+.detect-stat .n{ font-family:var(--mono); font-size:24px; font-weight:600; }
+.detect-stat .l{ font-size:11px; color:var(--text-dim); }
+
+/* ---------- 2분할: 캘린더 + 로그 ---------- */
+.combo-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+@media(max-width:900px){ .combo-row{ grid-template-columns:1fr; } }
+.cal-month h4{ font-size:12px; color:var(--text-dim); margin:0 0 8px 0; font-weight:600; }
+.cal-month + .cal-month{ margin-top:14px; }
+.cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.cal-dow{ font-size:9px; color:var(--text-faint); text-align:center; padding-bottom:2px; }
+.cal-cell{ aspect-ratio:1/0.8; border-radius:5px; border:1px solid var(--border-soft); padding:3px 4px; font-size:9px; position:relative; }
+.cal-cell.empty{ border:none; }
+.cal-cell .d{ color:var(--text-faint); }
+.cal-cell .pnl{ font-family:var(--mono); font-size:9px; position:absolute; bottom:3px; left:4px; right:4px; }
+.cal-cell.pos{ background:rgba(34,184,160,0.10); border-color:rgba(34,184,160,0.3); }
+.cal-cell.pos .pnl{ color:var(--up); }
+.cal-cell.neg{ background:rgba(240,82,95,0.10); border-color:rgba(240,82,95,0.3); }
+.cal-cell.neg .pnl{ color:var(--down); }
+
+.log-list{ display:flex; flex-direction:column; }
+.log-row{ display:grid; grid-template-columns:70px 64px 44px 60px 1fr; align-items:center; gap:8px; padding:8px 6px; border-bottom:1px solid var(--border-soft); font-size:11px; border-radius:5px; cursor:grab; }
+.log-row:last-child{ border-bottom:none; }
+.log-row:hover{ background:var(--bg-panel-2); }
+.log-row.dragging{ opacity:.4; }
+.log-row .date{ font-family:var(--mono); color:var(--text-dim); font-size:10px; }
+.log-row .pnl{ font-family:var(--mono); font-weight:600; }
+.log-row .pnl.pos{ color:var(--up); } .log-row .pnl.neg{ color:var(--down); }
+.badge-reviewed{ font-size:8.5px; background:rgba(34,184,160,0.1); color:var(--up); padding:2px 5px; border-radius:3px; }
+.badge-pending{ font-size:8.5px; background:rgba(123,130,150,0.12); color:var(--unscored); padding:2px 5px; border-radius:3px; }
+.log-head{ display:grid; grid-template-columns:70px 64px 44px 60px 1fr; font-size:9px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint); padding:0 6px 6px 6px; border-bottom:1px solid var(--border); }
+.log-hint{ font-size:10.5px; color:var(--text-faint); margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="mast">
+    <div class="mast-title">
+      <span style="font-size:20px;">📊</span>
+      <div><h1>TradeCoach</h1><div class="sub">ICT 기반 트레이딩 복기 코치</div></div>
+    </div>
+    <div class="mast-actions">
+      <button class="btn ghost">복기 목록으로</button>
+      <button class="btn">새 분석 시작</button>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="side-block">
+      <h3>AI 코칭 <span class="verify-badge llm" style="margin-left:6px;">AI 추론 · 미검증</span></h3>
+      <div class="coach-card"><p>과매매를 줄이고 수익률을 높이기 위해, 킬존 외의 진입을 피하고 OB(오더블럭)와 FVG(페어밸류갭)를 활용한 명확한 진입 기준을 설정해 보세요.</p></div>
+    </div>
+    <div class="side-block">
+      <details class="collapsible" open>
+        <summary>트레이딩 철학 &amp; ICT 원칙</summary>
+        <ul class="principle-list" style="margin-top:10px;">
+          <li>하루 3번 이상 손절 시 당일 거래 중단</li>
+          <li>매 거래 최대 손실금액 사전 고정</li>
+          <li>Revenge Trading 절대 금지</li>
+          <li>No Setup = No Trade</li>
+          <li>손절선은 진입 전에 결정</li>
+          <li>구조적 진입: FVG 또는 OB 구간 내 진입</li>
+          <li>추세 정렬: 상위 추세 방향으로만 진입</li>
+          <li>손절 위치: 구조적 레벨(FVG/OB 하단) 바깥</li>
+        </ul>
+        <div class="killzone-note">킬존 진입: 런던 02–05 UTC / 뉴욕 07–10 UTC</div>
+      </details>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="label">승률</div><div class="value">66.7%</div><div class="foot">WIN / TOTAL</div></div>
+      <div class="kpi-card"><div class="label">평균 수익률</div><div class="value">0.18%</div><div class="foot">closedPnl ÷ execValue</div></div>
+      <div class="kpi-card"><div class="label">수익금</div><div class="value neg">-$9.68</div><div class="foot">closedPnl 합계</div></div>
+      <div class="kpi-card"><div class="label">손절 일관성</div><div class="value">0.83</div><div class="foot">낮을수록 규칙적</div></div>
+    </div>
+
+    <div class="weakness-block">
+      <h3>약점 <span class="verify-badge rule" style="margin-left:6px;">코드검증</span></h3>
+      <div class="tag-row">
+        <div class="tag flag">수익률_낮음</div>
+        <div class="tag flag">과매매_감지</div>
+        <div class="tag flag">킬존외_진입</div>
+      </div>
+    </div>
+
+    <div class="scope-divider">
+      <span>↑ 위 KPI·약점은 <b>계좌 전체 · 최근 12건 종합</b> 기준 (사이드바 AI 코칭도 동일)</span>
+      <span>↓ 아래 복기 뷰어는 <b>열려있는 탭의 거래 1건</b> 기준</span>
+    </div>
+
+    <!-- ---------- 복기뷰어 (탭 + 드롭존) ---------- -->
+    <div class="panel viewer-dropzone" id="viewerPanel">
+      <div class="panel-head">
+        <h2>복기 뷰어</h2>
+        <div class="sub">아래 <b>복기 기록</b> 목록에서 거래를 드래그해 놓으면 탭이 추가됩니다</div>
+      </div>
+
+      <div class="trade-tabs" id="tradeTabs"></div>
+      <div class="viewer-current">현재 보고 있는 거래: <b id="currentTradeLabel"></b> <span style="color:var(--text-faint);">— 아래 3개 탭은 전부 이 거래 1건 기준 (사이드바 약점·코칭과는 별도)</span></div>
+
+      <div class="viewer-tabs">
+        <button class="tab-btn active" data-tab="chart">차트</button>
+        <button class="tab-btn" data-tab="aplus">A+ 채점</button>
+        <button class="tab-btn" data-tab="entry">진입 근거 · 코칭</button>
+      </div>
+
+      <!-- 탭1: 차트 -->
+      <div class="tab-panel active" id="tab-chart">
+        <div id="chartLoaded">
+          <div class="style-legend">
+            <span class="item"><span class="swatch" style="border:1.5px solid var(--killzone-line);background:var(--killzone);"></span>킬존</span>
+            <span class="item"><span class="swatch" style="border:1px dashed var(--neutral-line);background:var(--neutral-fill);"></span>Order Block</span>
+            <span class="item"><span class="swatch" style="border-top:1px dashed var(--neutral-line);border-bottom:1px dashed var(--neutral-line);background:none;"></span>Fair Value Gap</span>
+            <span class="item"><span class="swatch" style="background:var(--up);"></span>상승 / WIN / PASS</span>
+            <span class="item"><span class="swatch" style="background:var(--down);"></span>하락 / LOSS / FAIL</span>
+          </div>
+          <div class="chart-wrap"><svg id="chart" viewBox="0 0 1200 560" style="width:100%; height:auto; display:block;"></svg></div>
+          <div class="chart-caption">* 캔들 시세는 레이아웃 시연용 예시입니다. FVG/OB 좌표·진입/청산가·추세 기울기는 실제 화면 값을 사용했습니다.</div>
+        </div>
+        <div class="empty-state" id="chartEmpty">
+          <div class="big">이 거래는 아직 복기되지 않았습니다</div>
+          <div class="small">FVG/OB 자동 감지 + A+ 채점을 지금 실행할 수 있습니다</div>
+          <button class="btn">▶ 복기 시작</button>
+        </div>
+      </div>
+
+      <!-- 탭2: A+ 채점 -->
+      <div class="tab-panel" id="tab-aplus">
+        <div id="aplusLoaded">
+          <div class="aplus-rows">
+            <div class="aplus-row"><div style="color:var(--up);font-size:15px;">✓</div><div><div class="title">구조적 진입 (FVG/OB 구간 내)</div><div class="detail">진입가 83,844.50 = 03:00 OB 하단 경계(83,844.5)와 정확히 일치</div></div><div class="verdict pass">PASS</div></div>
+            <div class="aplus-row"><div style="color:var(--up);font-size:15px;">✓</div><div><div class="title">추세 정렬 (상위 추세 방향)</div><div class="detail">저항선 기울기 19.41 · 지지선 기울기 1.35 — 둘 다 우상향, Long 방향과 정합</div></div><div class="verdict pass">PASS</div></div>
+            <div class="aplus-row"><div style="color:var(--down);font-size:15px;">✕</div><div><div class="title">킬존 진입 (런던/뉴욕 세션)</div><div class="detail">진입 12:00 — 런던(02–05), 뉴욕(07–10) 세션 모두 종료 후</div></div><div class="verdict fail">FAIL</div></div>
+            <div class="aplus-row"><div style="color:var(--unscored);font-size:15px;">?</div><div><div class="title">손절 규율 준수</div><div class="detail">journal_entries 테이블 미생성 — 채점 근거 데이터 없음</div></div><div class="verdict unscored">데이터 없음</div></div>
+            <div class="aplus-row"><div style="color:var(--unscored);font-size:15px;">?</div><div><div class="title">포지션 사이징 적정성</div><div class="detail">손절가 미입력(0.00) — 적정 수량 계산 불가</div></div><div class="verdict unscored">데이터 없음</div></div>
+          </div>
+          <div class="aplus-tally"><div><span class="pass-n">2</span> PASS</div><div><span class="fail-n">1</span> FAIL</div><div><span class="unscored-n">2</span> 미채점</div></div>
+        </div>
+        <div class="empty-state" id="aplusEmpty">
+          <div class="big">채점할 복기 데이터가 없습니다</div>
+          <div class="small">차트 탭에서 복기를 먼저 시작하세요</div>
+        </div>
+      </div>
+
+      <!-- 탭3: 진입 근거 · 코칭 -->
+      <div class="tab-panel" id="tab-entry">
+        <div id="entryLoaded">
+          <div class="detect-row">
+            <div class="detect-stat"><div class="n">9</div><div class="l">FVG 감지</div></div>
+            <div class="detect-stat"><div class="n">20</div><div class="l">OB 감지</div></div>
+            <div class="detect-stat"><div class="n">2</div><div class="l">추세선</div></div>
+          </div>
+          <div class="judge-card">
+            <div class="verify-badge llm">AI 종합판단 · 미검증</div>
+            <p>구조적 진입 근거는 명확하나 킬존 밖 진입으로 리스크가 컸던 거래입니다. 손절 규율과 사이징 데이터가 없어 5기준 중 3기준만으로 판정했습니다.</p>
+            <div class="caution">사람 검증 이력 없음 — 기존 58% 지표는 이 코칭 텍스트가 아닌 별도 rule 채점(A+ 스코어)에 대한 자기라벨 순환검증입니다.</div>
+          </div>
+          <div class="chart-caption" style="margin-top:12px;">참고: 이전 버전에서는 LLM 호출 실패 시 <code>Missing credentials...</code> 같은 원본 예외 메시지가 이 자리에 그대로 노출되는 버그가 있었습니다(2단계 감사 항목 1·6). 위 카드는 그 실패 상황에서도 "AI 코칭 생성 실패 — 잠시 후 다시 시도해주세요" 같은 사용자용 문구로 대체하는 걸 전제로 한 정상 상태 예시입니다.</div>
+        </div>
+        <div class="empty-state" id="entryEmpty">
+          <div class="big">진입 근거를 추론할 복기 데이터가 없습니다</div>
+          <div class="small">차트 탭에서 복기를 먼저 시작하세요</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 2분할: 캘린더 + 적재 로그 ---------- -->
+    <div class="combo-row">
+      <div class="panel">
+        <div class="panel-head"><h2>일별 손익 캘린더</h2><div class="sub">2025-04~05</div></div>
+        <div id="calendars"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>복기 기록 (누적)</h2><div class="sub">journal_write → memory_save</div></div>
+        <div class="log-head"><div>일시</div><div>종목</div><div>결과</div><div>손익</div><div>상태</div></div>
+        <div class="log-list" id="journal-log"></div>
+        <div class="log-hint">💡 행을 위 복기 뷰어로 드래그하면 그 거래를 불러옵니다</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const TRADES = [
+  {id:'ETH-004', sym:'ETHUSDT', date:'2025-05-06', time:'23:00', result:'WIN', pnl:8.00, reviewed:false},
+  {id:'BTC-006', sym:'BTCUSDT', date:'2025-05-05', time:'07:00', result:'LOSS', pnl:-92.50, reviewed:false},
+  {id:'SOL-002', sym:'SOLUSDT', date:'2025-05-02', time:'12:00', result:'LOSS', pnl:-6.00, reviewed:false},
+  {id:'ETH-003', sym:'ETHUSDT', date:'2025-05-01', time:'04:00', result:'WIN', pnl:11.18, reviewed:false},
+  {id:'BTC-005', sym:'BTCUSDT', date:'2025-04-28', time:'17:00', result:'WIN', pnl:9.00, reviewed:false},
+  {id:'ETH-002', sym:'ETHUSDT', date:'2025-04-26', time:'09:00', result:'WIN', pnl:20.27, reviewed:false},
+  {id:'BTC-004', sym:'BTCUSDT', date:'2025-04-26', time:'03:00', result:'WIN', pnl:50.67, reviewed:false},
+  {id:'SOL-001', sym:'SOLUSDT', date:'2025-04-23', time:'23:00', result:'WIN', pnl:10.00, reviewed:false},
+  {id:'BTC-003', sym:'BTCUSDT', date:'2025-04-21', time:'20:00', result:'LOSS', pnl:-23.94, reviewed:false},
+  {id:'ETH-001', sym:'ETHUSDT', date:'2025-04-19', time:'17:00', result:'WIN', pnl:4.41, reviewed:false},
+  {id:'BTC-002', sym:'BTCUSDT', date:'2025-04-18', time:'05:00', result:'WIN', pnl:10.13, reviewed:false},
+  {id:'BTC-001', sym:'BTCUSDT', date:'2025-04-16', time:'12:00', result:'LOSS', pnl:-10.90, reviewed:true},
+];
+
+// ---------- 적재 로그 (드래그 가능) ----------
+const logEl = document.getElementById('journal-log');
+TRADES.forEach((t,i)=>{
+  const row = document.createElement('div');
+  row.className = 'log-row';
+  row.draggable = true;
+  row.dataset.tradeId = t.id;
+  const pnlClass = t.pnl >= 0 ? 'pos' : 'neg';
+  const badge = t.reviewed ? '<span class="badge-reviewed">A+ 완료</span>' : '<span class="badge-pending">미복기</span>';
+  row.innerHTML = `
+    <div class="date">${t.date.slice(5)}<br>${t.time}</div>
+    <div>${t.sym}</div>
+    <div style="color:${t.result==='WIN'?'var(--up)':'var(--down)'}">${t.result}</div>
+    <div class="pnl ${pnlClass}">${t.pnl>=0?'+':''}$${t.pnl.toFixed(2)}</div>
+    <div>${badge}</div>
+  `;
+  row.addEventListener('dragstart', e=>{
+    e.dataTransfer.setData('text/plain', t.id);
+    row.classList.add('dragging');
+  });
+  row.addEventListener('dragend', ()=> row.classList.remove('dragging'));
+  logEl.appendChild(row);
+});
+
+// ---------- 캘린더 ----------
+const dayPnl = {};
+TRADES.forEach(t=>{ dayPnl[t.date] = (dayPnl[t.date]||0) + t.pnl; });
+function renderMonth(year, month, container){
+  const wrap = document.createElement('div'); wrap.className = 'cal-month';
+  const title = document.createElement('h4'); title.textContent = `${year}년 ${month+1}월`; wrap.appendChild(title);
+  const grid = document.createElement('div'); grid.className = 'cal-grid';
+  ['월','화','수','목','금','토','일'].forEach(d=>{ const dd=document.createElement('div'); dd.className='cal-dow'; dd.textContent=d; grid.appendChild(dd); });
+  const first = new Date(year, month, 1);
+  const startOffset = (first.getDay()+6)%7;
+  for(let i=0;i<startOffset;i++){ const c=document.createElement('div'); c.className='cal-cell empty'; grid.appendChild(c); }
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const cell = document.createElement('div'); cell.className = 'cal-cell';
+    let inner = `<div class="d">${d}</div>`;
+    if(dayPnl[dateStr] !== undefined){
+      const v = dayPnl[dateStr];
+      cell.className += v>=0 ? ' pos' : ' neg';
+      inner += `<div class="pnl">${v>=0?'+':''}$${v.toFixed(2)}</div>`;
+    }
+    cell.innerHTML = inner; grid.appendChild(cell);
+  }
+  wrap.appendChild(grid); container.appendChild(wrap);
+}
+const calContainer = document.getElementById('calendars');
+renderMonth(2025,3,calContainer);
+renderMonth(2025,4,calContainer);
+
+// ---------- 탭 전환 ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- 거래별 탭 (드롭할 때마다 추가되는 브라우저 탭 방식) ----------
+const viewerPanel = document.getElementById('viewerPanel');
+const currentLabel = document.getElementById('currentTradeLabel');
+const tradeTabsEl = document.getElementById('tradeTabs');
+let openTrades = ['BTC-001'];   // 시작 시 기본 1개 탭 열려있음
+let activeTradeId = 'BTC-001';
+
+function renderTradeTabs(){
+  tradeTabsEl.innerHTML = '';
+  if(openTrades.length===0){
+    tradeTabsEl.innerHTML = '<div class="trade-tab-empty-hint">드래그해서 아래 복기 기록에서 거래를 여기로 가져오세요</div>';
+    return;
+  }
+  openTrades.forEach(id=>{
+    const t = TRADES.find(tt=>tt.id===id);
+    const tab = document.createElement('div');
+    tab.className = 'trade-tab' + (id===activeTradeId ? ' active':'');
+    tab.innerHTML = `<span>${t.id}</span><span class="close" data-id="${id}">×</span>`;
+    tab.addEventListener('click', (e)=>{ if(!e.target.classList.contains('close')) setActiveTrade(id); });
+    tab.querySelector('.close').addEventListener('click', (e)=>{ e.stopPropagation(); closeTradeTab(id); });
+    tradeTabsEl.appendChild(tab);
+  });
+}
+
+function openTradeTab(id){
+  if(!openTrades.includes(id)) openTrades.push(id);
+  setActiveTrade(id, true);
+}
+
+function setActiveTrade(id, resetToChart){
+  activeTradeId = id;
+  renderTradeTabs();
+  renderActiveContent();
+  if(resetToChart) document.querySelector('.tab-btn[data-tab="chart"]').click();
+}
+
+function closeTradeTab(id){
+  const idx = openTrades.indexOf(id);
+  if(idx>-1) openTrades.splice(idx,1);
+  if(activeTradeId===id) activeTradeId = openTrades.length ? openTrades[openTrades.length-1] : null;
+  renderTradeTabs();
+  renderActiveContent();
+}
+
+function renderActiveContent(){
+  const empties = ['chartEmpty','aplusEmpty','entryEmpty'];
+  const loadeds = ['chartLoaded','aplusLoaded','entryLoaded'];
+  if(!activeTradeId){
+    currentLabel.textContent = '— 열린 탭 없음';
+    loadeds.forEach(id=> document.getElementById(id).style.display='none');
+    empties.forEach(id=> document.getElementById(id).classList.remove('show'));
+    return;
+  }
+  const trade = TRADES.find(t=>t.id===activeTradeId);
+  currentLabel.textContent = `${trade.id} · ${trade.date}`;
+  const hasData = trade.reviewed; // 이 목업에선 BTC-001만 실제 복기 데이터 보유
+  loadeds.forEach(id=> document.getElementById(id).style.display = hasData?'block':'none');
+  empties.forEach(id=> document.getElementById(id).classList.toggle('show', !hasData));
+}
+
+viewerPanel.addEventListener('dragover', e=>{ e.preventDefault(); viewerPanel.classList.add('dragover'); });
+viewerPanel.addEventListener('dragleave', ()=> viewerPanel.classList.remove('dragover'));
+viewerPanel.addEventListener('drop', e=>{
+  e.preventDefault();
+  viewerPanel.classList.remove('dragover');
+  const id = e.dataTransfer.getData('text/plain');
+  if(!TRADES.find(t=>t.id===id)) return;
+  openTradeTab(id);
+});
+
+renderTradeTabs();
+renderActiveContent();
+
+// ---------- 차트 (BTC-001 고정 렌더 — 실제 복기 데이터 보유 거래) ----------
+(function(){
+  const svg = document.getElementById('chart');
+  const NS = 'http://www.w3.org/2000/svg';
+  const T_START=0, T_END=1080;
+  const Y_MIN=82900, Y_MAX=84250;
+  const PAD_L=16, PAD_R=70, PAD_T=70, PAD_B=34;
+  const W=1200, H=560;
+  const plotW = W-PAD_L-PAD_R, plotH = H-PAD_T-PAD_B;
+  function x(t){ return PAD_L + (t/T_END)*plotW; }
+  function y(p){ return PAD_T + (1-(p-Y_MIN)/(Y_MAX-Y_MIN))*plotH; }
+  function el(tag, attrs, txt){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); if(txt!=null) e.textContent=txt; return e; }
+
+  for(let p=83000; p<=84200; p+=200){
+    svg.appendChild(el('line',{x1:PAD_L,y1:y(p),x2:W-PAD_R,y2:y(p),stroke:'#1B2030','stroke-width':1}));
+    svg.appendChild(el('text',{x:W-PAD_R+8,y:y(p)+4,'font-size':10,fill:'#8B93A3','font-family':'monospace'}, p.toLocaleString()));
+  }
+  for(let h=0; h<=18; h+=2){
+    const t=h*60;
+    svg.appendChild(el('line',{x1:x(t),y1:PAD_T,x2:x(t),y2:H-PAD_B,stroke:'#1B2030','stroke-width':1}));
+    svg.appendChild(el('text',{x:x(t),y:H-PAD_B+16,'text-anchor':'middle','font-size':10,fill:'#8B93A3','font-family':'monospace'}, String(h).padStart(2,'0')+':00'));
+  }
+
+  function callout(px, py, lx, ly, lines, align){
+    align = align || 'left';
+    svg.appendChild(el('line',{x1:px,y1:py,x2:lx,y2:ly,stroke:'#C9CDD6','stroke-width':1,'stroke-dasharray':'2,2'}));
+    svg.appendChild(el('circle',{cx:px,cy:py,r:2.5,fill:'#C9CDD6'}));
+    const padX=8, lineH=13, boxW = Math.max(...lines.map(l=>l.length))*6.1 + padX*2;
+    const boxH = lines.length*lineH + 10;
+    const bx = align==='left' ? lx : lx-boxW;
+    svg.appendChild(el('rect',{x:bx,y:ly-boxH/2,width:boxW,height:boxH,rx:4,fill:'#0D0F14',stroke:'rgba(255,255,255,0.25)','stroke-width':1}));
+    lines.forEach((line,i)=>{ svg.appendChild(el('text',{x:bx+padX,y:ly-boxH/2+16+i*lineH,'font-size':10.5,fill:'#EDEAE2','font-family':'sans-serif'}, line)); });
+  }
+
+  [[120,300,'런던 킬존'],[420,600,'뉴욕 킬존']].forEach(([t0,t1,label])=>{
+    svg.appendChild(el('rect',{x:x(t0),y:PAD_T,width:x(t1)-x(t0),height:plotH,fill:'rgba(134,118,201,0.09)'}));
+    svg.appendChild(el('line',{x1:x(t0),y1:PAD_T,x2:x(t0),y2:H-PAD_B,stroke:'rgba(134,118,201,0.5)','stroke-width':1,'stroke-dasharray':'2,2'}));
+    svg.appendChild(el('line',{x1:x(t1),y1:PAD_T,x2:x(t1),y2:H-PAD_B,stroke:'rgba(134,118,201,0.5)','stroke-width':1,'stroke-dasharray':'2,2'}));
+    svg.appendChild(el('text',{x:(x(t0)+x(t1))/2,y:PAD_T-8,'text-anchor':'middle','font-size':9.5,fill:'#8676C9'}, label));
+  });
+
+  const allFvg = [[0,83478.6,83568.0],[105,83456.8,83537.1],[210,83694.0,83738.6],[315,83427.7,83485.8],[435,83422.7,83478.8],[495,83331.0,83555.2]];
+  const allOb = [[15,83265.9,83445.5],[45,83096.1,83331.1],[90,83362.3,83456.7],[150,83680.0,83800.7],[240,83634.6,83654.2],[270,83417.9,83523.1],[285,83417.9,83530.4],[300,83530.4,83703.9],[375,83426.6,83439.5],[405,83544.0,83599.5],[465,83312.8,83394.5],[480,83122.6,83312.8]];
+  const LIFESPAN=80;
+  allFvg.forEach(([t,lo,hi])=>{
+    const t1=Math.min(t+LIFESPAN,T_END);
+    svg.appendChild(el('line',{x1:x(t),y1:y(hi),x2:x(t1),y2:y(hi),stroke:'rgba(255,255,255,0.12)','stroke-width':1,'stroke-dasharray':'3,3'}));
+    svg.appendChild(el('line',{x1:x(t),y1:y(lo),x2:x(t1),y2:y(lo),stroke:'rgba(255,255,255,0.12)','stroke-width':1,'stroke-dasharray':'3,3'}));
+  });
+  allOb.forEach(([t,lo,hi])=>{
+    const t1=Math.min(t+LIFESPAN,T_END);
+    svg.appendChild(el('rect',{x:x(t),y:y(hi),width:x(t1)-x(t),height:Math.max(y(lo)-y(hi),1),fill:'rgba(255,255,255,0.03)',stroke:'rgba(255,255,255,0.1)','stroke-width':1}));
+  });
+
+  const obT0=180, obT1=Math.min(180+LIFESPAN,T_END), obLo=83844.5, obHi=83874.7;
+  svg.appendChild(el('rect',{x:x(obT0),y:y(obHi),width:x(obT1)-x(obT0),height:Math.max(y(obLo)-y(obHi),3),fill:'rgba(255,255,255,0.06)',stroke:'#C9CDD6','stroke-width':1.3,'stroke-dasharray':'5,3'}));
+  callout(x(obT0)+(x(obT1)-x(obT0))/2, y(obHi), x(obT0)-40, y(obHi)-46, ['Order Block','04-16 03:00','83,844.5–83,874.7'],'left');
+
+  const fvT=420, fvT1=Math.min(420+LIFESPAN,T_END), fvLo=83513.3, fvHi=83527.9;
+  svg.appendChild(el('line',{x1:x(fvT),y1:y(fvHi),x2:x(fvT1),y2:y(fvHi),stroke:'#C9CDD6','stroke-width':1.3,'stroke-dasharray':'5,3'}));
+  svg.appendChild(el('line',{x1:x(fvT),y1:y(fvLo),x2:x(fvT1),y2:y(fvLo),stroke:'#C9CDD6','stroke-width':1.3,'stroke-dasharray':'5,3'}));
+  callout(x(fvT)+(x(fvT1)-x(fvT))/2, (y(fvHi)+y(fvLo))/2, x(fvT1)+30, y(fvHi)-30, ['Fair Value Gap','04-16 07:00'],'left');
+
+  svg.appendChild(el('line',{x1:x(0),y1:y(84000),x2:x(1080),y2:y(83650),stroke:'#C9CDD6','stroke-width':1.2,'stroke-dasharray':'6,4'}));
+  svg.appendChild(el('line',{x1:x(0),y1:y(83250),x2:x(1080),y2:y(83850),stroke:'#C9CDD6','stroke-width':1.2,'stroke-dasharray':'6,4'}));
+  callout(x(900), y(83780), x(900)-10, y(84000)-64, ['추세 구조','저항 기울기 19.41','지지 기울기 1.35 (우상향)'],'left');
+
+  const anchors=[[0,83550],[90,83350],[180,83860],[270,83500],[375,83400],[420,83520],[495,83450],[600,83600],[720,83844.5],[900,83735.5],[1080,83800]];
+  function interp(t){ for(let i=0;i<anchors.length-1;i++){ const [t0,p0]=anchors[i],[t1,p1]=anchors[i+1]; if(t>=t0&&t<=t1){ const f=(t-t0)/(t1-t0); return p0+(p1-p0)*f; } } return anchors[anchors.length-1][1]; }
+  let seed=7; function rnd(){ seed=(seed*9301+49297)%233280; return seed/233280; }
+  const STEP=25;
+  for(let t=T_START;t<T_END;t+=STEP){
+    const o=interp(t)+(rnd()-0.5)*16, c=interp(t+STEP)+(rnd()-0.5)*16;
+    const hi=Math.max(o,c)+rnd()*30, lo=Math.min(o,c)-rnd()*30;
+    const color = (c>=o) ? 'var(--up)' : 'var(--down)';
+    const cx=x(t+STEP/2);
+    svg.appendChild(el('line',{x1:cx,y1:y(hi),x2:cx,y2:y(lo),stroke:color,'stroke-width':1.1}));
+    const bTop=y(Math.max(o,c)), bBot=y(Math.min(o,c));
+    svg.appendChild(el('rect',{x:cx-6,y:bTop,width:12,height:Math.max(bBot-bTop,1.3),fill:color}));
+  }
+
+  const enX=x(720), enY=y(83844.5);
+  svg.appendChild(el('circle',{cx:enX,cy:enY,r:4,fill:'none',stroke:'#F0525F','stroke-width':2}));
+  callout(enX, enY, enX+16, enY-70, ['진입 12:00','83,844.50 · Long'],'left');
+
+  const exX=x(900), exY=y(83735.5);
+  svg.appendChild(el('circle',{cx:exX,cy:exY,r:4,fill:'#F0525F'}));
+  callout(exX, exY, exX+16, exY+56, ['청산','83,735.50','LOSS -$10.90'],'left');
+})();
+</script>
+</body>
+</html>
