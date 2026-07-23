@@ -41,3 +41,52 @@ tradecoach_mockup_v7.html(최종 목업), 2단계 감사 보고서. 다음 코�
   이번 명명·감사·재설계 서사 활용)
 - v3.0 Style Layer에서 DCA 페르소나 분기 설계(오늘 발견한 커버 갭 근거)
 - Decision 37과 결함1/9의 관계는 STEP1 조사에서 재확인 필요 — 병합 시 발견됨.
+
+---
+
+## 2026-07-22: STEP1 진단 확정 세션 (Decision 46)
+
+**발견:** 결함4/10이 예상보다 큼(이름 충돌·유령 테이블), 존 렌더링은 백엔드
+문제가 아니라 프론트 필터링 부재였음.
+
+**원인:** journal_entries 이름이 두 그래프(메인/복기)에서 각각 다른 실체를
+가리킴. 스키마 설계서에 애초에 해당 테이블 없음.
+
+**조치:** 코드 변경 없음(조사만). 수정 세션 순서 재조정 — A/B/존필터링을 한
+세션으로, C(손절규율 재설계)는 설계결정 선행 필요해 분리.
+
+**결과:** Decision 46 기록. 다음 세션 = A+B+존필터링 코딩(즉시 착수 가능),
+C는 trade_tags/trade_history 스키마 확인 후 별도 착수.
+
+---
+
+## 2026-07-23: STEP2a 코딩 세션 — fallback 방어 + 실패/빈데이터 구분 + 존 렌더링 필터링
+
+**발견:** 세 항목 모두 Decision 46에서 확정한 방향대로 구현 가능했음. 다만
+Fix B 범위를 bybit_client.py로 한정해서 UpbitClient.fetch_candles는 여전히
+예외를 삼켜 [] 반환 — Upbit 경로는 실패/빈데이터 구분이 아직 안 됨.
+
+**원인:** (착수 시점에 이미 원인 특정된 항목들이라 조사 아님) Fix A는
+fallback_classify_node에 다른 5개 LLM 노드와 다르게 try/except가 없었던 게
+원인. Fix B는 BybitClient.fetch_candles가 실패/빈응답을 동일하게 [] 처리한
+게 원인. Fix C는 존 rect의 x1이 항상 차트 끝까지였던 게 원인(발생시각은
+이미 정확히 쓰고 있었음 — Decision 46에서 확인한 대로).
+
+**조치:**
+- fix(coaching-nodes): _classify_tag/_handle_ict/fallback_classify_node에
+  try/except 추가, 실패 시 pattern 분류로 폴백
+- fix(candles): BybitClient.fetch_candles 예외 전파로 전환,
+  market/candles.py::get_candles가 실패(CandleFetchError)/빈데이터([])를
+  분기, 더미 생성은 sample_mode 전용으로 제한, api/main.py 404를
+  실제 도달 가능하게 하고 실패는 503으로 분리
+- fix(replay-viewer): 존 x1을 발생시각+90분 고정폭으로 클리핑, 진입가를
+  감싸는 존 최대 2개만 강조, 색을 무채색으로 전환
+
+**결과:** 3개 커밋 전부 로컬에 완료(push 안 함). 재현 확인: Fix A는
+LLM mock 실패 후 예외 전파 없이 pattern 폴백 확인, Fix B는 (a)키없음
+(b)네트워크예외 (c)진짜빈데이터 세 케이스 모두 의도대로 분기 확인, Fix C는
+BTC-001 실거래 데이터로 90분 클리핑 + 진입가 포함 존 1개 정확히 강조되는
+것 확인(픽셀 스크린샷 비교는 브라우저 확장 미설치로 생략, 로직 검증만).
+다음 세션: 손절규율(C, Decision 46의 별도 트랙) — journal_entries 저장
+위치 설계 결정 선행, Upbit 캔들 경로 실패/빈데이터 구분도 아직 미해결로
+남음.
