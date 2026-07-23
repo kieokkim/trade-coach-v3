@@ -88,17 +88,25 @@ def score_aplus(
     if bd["killzone"]:
         s += 1
 
-    # 5. 손절 규율: 당일 손절 3회 미만
+    # 5. 손절 규율: 당일 손절 3회 미만 (journal_entries 데이터 없으면 unscored=None)
     try:
         today = datetime.fromtimestamp(exec_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
-        row = db_conn.execute(
-            "SELECT COUNT(*) FROM journal_entries "
-            "WHERE session_id=? AND date LIKE ? AND result='loss'",
+        total = db_conn.execute(
+            "SELECT COUNT(*) FROM journal_entries WHERE session_id=? AND date LIKE ?",
             (session_id, f"{today}%"),
-        ).fetchone()
-        bd["stop_discipline"] = (row[0] if row else 0) < 3
-    except Exception:
-        bd["stop_discipline"] = True
+        ).fetchone()[0]
+        if total == 0:
+            bd["stop_discipline"] = None
+        else:
+            losses = db_conn.execute(
+                "SELECT COUNT(*) FROM journal_entries "
+                "WHERE session_id=? AND date LIKE ? AND result='loss'",
+                (session_id, f"{today}%"),
+            ).fetchone()[0]
+            bd["stop_discipline"] = losses < 3
+    except Exception as e:
+        logger.warning("score_aplus: stop_discipline 조회 실패: %s", e)
+        bd["stop_discipline"] = None
     if bd["stop_discipline"]:
         s += 1
 
@@ -176,7 +184,7 @@ def entry_reason_node(
         f"반등확인{'✅' if bd['bounce_confirm'] else '❌'} "
         f"추세정렬{'✅' if bd['trend_aligned'] else '❌'} "
         f"킬존{'✅' if bd['killzone'] else '❌'} "
-        f"손절규율{'✅' if bd['stop_discipline'] else '❌'}\n"
+        f"손절규율{'✅' if bd['stop_discipline'] is True else '❌' if bd['stop_discipline'] is False else '데이터없음'}\n"
         f"캔들(진입전→후): {' | '.join(fmt(c) for c in before + after)}\n"
         f"트레이딩 철학: {TRADING_PHILOSOPHY}\n"
         f"{pattern_context}\n"
