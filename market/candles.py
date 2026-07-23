@@ -10,6 +10,11 @@ from market.upbit_client import UpbitClient
 logger = logging.getLogger(__name__)
 
 
+class CandleFetchError(Exception):
+    """캔들 조회가 (진짜) 실패했을 때 — API 키 없음/네트워크 예외 등.
+    정상 조회했으나 0건인 경우와 구분하기 위한 전용 예외."""
+
+
 def normalize_exec_time(exec_ms: int, interval_min: int = 15) -> int:
     """execTime을 해당 캔들 시작 타임스탬프로 정규화."""
     interval_ms = interval_min * 60 * 1000
@@ -111,23 +116,36 @@ def get_candles(
                 symbol, interval, limit, start, exchange)
 
     client = _get_candle_client(exchange)
-    if client:
-        candles = client.fetch_candles(symbol, interval, start, limit)
-        if candles:
-            return candles
+    if client is None:
+        logger.warning("get_candles: %s API 키 없음 — real fetch 불가", exchange)
+        if sample_mode:
+            return _generate_dummy_candles(entry_time_ms, limit, interval)
+        raise CandleFetchError(f"{exchange} API 키가 설정되지 않았습니다.")
 
-    return _generate_dummy_candles(entry_time_ms, limit, interval)
+    try:
+        candles = client.fetch_candles(symbol, interval, start, limit)
+    except Exception as e:
+        logger.warning("get_candles: %s fetch_candles 실패 | symbol=%s: %s", exchange, symbol, e)
+        if sample_mode:
+            return _generate_dummy_candles(entry_time_ms, limit, interval)
+        raise CandleFetchError(f"{exchange} 캔들 조회 실패: {e}") from e
+
+    if not candles:
+        logger.info("get_candles: %s 정상 응답, 캔들 0건 | symbol=%s", exchange, symbol)
+
+    return candles
 
 
 def _get_candle_client(exchange: str):
     if exchange == "Upbit":
         access_key = os.getenv("UPBIT_ACCESS_KEY", "")
         secret_key = os.getenv("UPBIT_SECRET_KEY", "")
-        if access_key and secret_key:
-            return UpbitClient(access_key, secret_key)
-        return UpbitClient("", "")
+        if not (access_key and secret_key):
+            return None
+        return UpbitClient(access_key, secret_key)
 
-    return BybitClient(
-        os.getenv("BYBIT_API_KEY", ""),
-        os.getenv("BYBIT_API_SECRET", ""),
-    )
+    api_key = os.getenv("BYBIT_API_KEY", "")
+    api_secret = os.getenv("BYBIT_API_SECRET", "")
+    if not (api_key and api_secret):
+        return None
+    return BybitClient(api_key, api_secret)

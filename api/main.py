@@ -14,7 +14,7 @@ from graph import graph, DEFAULT_STATE
 from ict.fvg_detector import detect_fvg
 from ict.ob_detector import detect_ob
 from ict.trend_detector import detect_trendline
-from market.candles import get_candles
+from market.candles import get_candles, CandleFetchError
 from nodes.entry_reason_node import entry_reason_node
 
 logger = logging.getLogger(__name__)
@@ -109,12 +109,15 @@ class AplusRequest(BaseModel):
 @app.post("/replay/candles")
 def get_replay_candles(req: ReplayRequest):
     """캔들 + ICT 패턴 탐지 결과 반환."""
-    candles = get_candles(
-        req.symbol, req.entry_time_ms,
-        order_id=req.order_id or None,
-        sample_mode=req.sample_mode or False,
-        exchange=req.exchange,
-    )
+    try:
+        candles = get_candles(
+            req.symbol, req.entry_time_ms,
+            order_id=req.order_id or None,
+            sample_mode=req.sample_mode or False,
+            exchange=req.exchange,
+        )
+    except CandleFetchError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     if not candles:
         raise HTTPException(status_code=404, detail="캔들 데이터 없음")
 
@@ -129,11 +132,14 @@ def get_replay_candles(req: ReplayRequest):
 @app.post("/replay/aplus")
 def get_aplus_score(req: AplusRequest):
     """A+ 채점 + 진입 근거 추론 + RAG 보강 코칭."""
-    candles = get_candles(
-        req.symbol, req.execTime,
-        sample_mode=req.sample_mode or False,
-        exchange=req.exchange,
-    )
+    try:
+        candles = get_candles(
+            req.symbol, req.execTime,
+            sample_mode=req.sample_mode or False,
+            exchange=req.exchange,
+        )
+    except CandleFetchError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     if not candles:
         raise HTTPException(status_code=404, detail="캔들 데이터 없음")
 

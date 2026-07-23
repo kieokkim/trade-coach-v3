@@ -54,32 +54,30 @@ class BybitClient(ExchangeClient):
     def fetch_candles(
         self, symbol: str, interval: str, start_ms: int, limit: int
     ) -> list[dict]:
+        """캔들 조회. 실패 시 예외를 그대로 전파 — 호출부(market/candles.py)가
+        "조회 실패"와 "정상 조회했으나 0건"을 구분해야 하므로 여기서 삼키지 않는다."""
         session = HTTP(testnet=False)
-        try:
-            response = session.get_kline(
-                category="linear",
-                symbol=symbol,
-                interval=interval,
-                start=start_ms,
-                limit=limit,
-            )
-            candles = [
-                {
-                    "timestamp": int(c[0]),
-                    "open": float(c[1]),
-                    "high": float(c[2]),
-                    "low": float(c[3]),
-                    "close": float(c[4]),
-                    "volume": float(c[5]),
-                }
-                for c in response["result"]["list"]
-            ]
-            candles.sort(key=lambda x: x["timestamp"])
-            logger.info("BybitClient.fetch_candles: %d candles for %s", len(candles), symbol)
-            return candles
-        except Exception as e:
-            logger.warning("BybitClient.fetch_candles failed: %s", e)
-            return []
+        response = session.get_kline(
+            category="linear",
+            symbol=symbol,
+            interval=interval,
+            start=start_ms,
+            limit=limit,
+        )
+        candles = [
+            {
+                "timestamp": int(c[0]),
+                "open": float(c[1]),
+                "high": float(c[2]),
+                "low": float(c[3]),
+                "close": float(c[4]),
+                "volume": float(c[5]),
+            }
+            for c in response["result"]["list"]
+        ]
+        candles.sort(key=lambda x: x["timestamp"])
+        logger.info("BybitClient.fetch_candles: %d candles for %s", len(candles), symbol)
+        return candles
 
     def check_permissions(self) -> dict:
         try:
