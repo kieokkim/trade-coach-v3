@@ -490,25 +490,70 @@ else:
             decreasing_line_color="#ef5350",
         )])
 
+        # 존 유효폭(발생시각부터) — 차트 전체폭까지 늘어붙지 않게 고정폭으로 클리핑
+        _ZONE_LIFESPAN = pd.Timedelta(minutes=90)
+        _chart_end = df_c["dt"].max()
+        _entry_price = float(buy_t.get("execPrice", 0))
+        _entry_ms    = int(buy_t.get("execTime", 0))
+
+        def _relevant_ids(zones: list[dict]) -> set[int]:
+            """진입 이전 발생 + 진입가를 감싸는 존 중 진입시각에 가장 가까운 최대 2개."""
+            before = [z for z in zones if z.get("timestamp", 0) < _entry_ms]
+            matching = [
+                z for z in before
+                if float(z["bottom"]) <= _entry_price <= float(z["top"])
+            ]
+            matching.sort(key=lambda z: -z["timestamp"])
+            return {id(z) for z in matching[:2]}
+
+        _relevant = _relevant_ids(fvgs) | _relevant_ids(obs)
+
         for fvg in fvgs:
-            fvg_dt = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True).tz_convert("Asia/Seoul")
-            color  = "rgba(255,200,0,0.2)" if fvg["type"] == "bullish" else "rgba(255,80,80,0.15)"
+            fvg_dt  = pd.to_datetime(fvg["timestamp"], unit="ms", utc=True).tz_convert("Asia/Seoul")
+            fvg_end = min(fvg_dt + _ZONE_LIFESPAN, _chart_end)
+            relevant = id(fvg) in _relevant
             fig.add_shape(
                 type="rect",
-                x0=fvg_dt, x1=df_c["dt"].max(),
+                x0=fvg_dt, x1=fvg_end,
                 y0=fvg["bottom"], y1=fvg["top"],
-                fillcolor=color, line_width=0, layer="below",
+                fillcolor=f"rgba(255,255,255,{0.14 if relevant else 0.04})",
+                line=dict(
+                    color="rgba(220,220,220,0.75)" if relevant else "rgba(255,255,255,0.10)",
+                    width=1.5 if relevant else 1,
+                    dash="dot",
+                ),
+                layer="below",
             )
+            if relevant:
+                fig.add_annotation(
+                    x=fvg_dt, y=fvg["top"], text=f"FVG {fvg['type']}",
+                    showarrow=True, arrowhead=2, ax=-30, ay=-20,
+                    font=dict(size=10, color="#C9CDD6"),
+                    bgcolor="rgba(20,24,32,0.85)",
+                )
 
         for ob in obs:
             ob_dt  = pd.to_datetime(ob["timestamp"], unit="ms", utc=True).tz_convert("Asia/Seoul")
-            ob_clr = "rgba(0,200,100,0.15)" if ob["type"] == "bullish" else "rgba(200,50,50,0.15)"
+            ob_end = min(ob_dt + _ZONE_LIFESPAN, _chart_end)
+            relevant = id(ob) in _relevant
             fig.add_shape(
                 type="rect",
-                x0=ob_dt, x1=df_c["dt"].max(),
+                x0=ob_dt, x1=ob_end,
                 y0=ob["bottom"], y1=ob["top"],
-                fillcolor=ob_clr, line_width=0, layer="below",
+                fillcolor=f"rgba(255,255,255,{0.10 if relevant else 0.03})",
+                line=dict(
+                    color="rgba(220,220,220,0.75)" if relevant else "rgba(255,255,255,0.10)",
+                    width=1.5 if relevant else 1,
+                ),
+                layer="below",
             )
+            if relevant:
+                fig.add_annotation(
+                    x=ob_dt, y=ob["top"], text=f"OB {ob['type']}",
+                    showarrow=True, arrowhead=2, ax=-30, ay=20,
+                    font=dict(size=10, color="#C9CDD6"),
+                    bgcolor="rgba(20,24,32,0.85)",
+                )
 
         if tl:
             dt0 = df_c["dt"].iloc[0]
