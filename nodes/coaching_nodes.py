@@ -136,36 +136,44 @@ def _get_generate_llm():
 
 
 def _classify_tag(tag: str) -> str:
-    result = _get_classify_llm().invoke([
-        {"role": "system", "content": _CLASSIFY_SYSTEM},
-        {"role": "user", "content": f"약점 태그: {tag}"},
-    ])
-    return result.content.strip()
+    try:
+        result = _get_classify_llm().invoke([
+            {"role": "system", "content": _CLASSIFY_SYSTEM},
+            {"role": "user", "content": f"약점 태그: {tag}"},
+        ])
+        return result.content.strip()
+    except Exception as e:
+        logger.warning("_classify_tag LLM error: %s | tag=%s", e, tag)
+        return ""
 
 
 def _handle_ict(tag: str) -> str:
-    gen = _get_generate_llm().invoke([
-        {"role": "system", "content": _GENERATE_SYSTEM},
-        {"role": "user", "content": f"약점 태그: {tag}"},
-    ])
-    concept_data: dict = json.loads(gen.content)
-    concept_data["category"] = "auto_generated"
+    try:
+        gen = _get_generate_llm().invoke([
+            {"role": "system", "content": _GENERATE_SYSTEM},
+            {"role": "user", "content": f"약점 태그: {tag}"},
+        ])
+        concept_data: dict = json.loads(gen.content)
+        concept_data["category"] = "auto_generated"
 
-    concepts = json.loads(_CONCEPTS_PATH.read_text(encoding="utf-8"))
-    concepts[tag] = concept_data
-    _CONCEPTS_PATH.write_text(
-        json.dumps(concepts, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    import tools.concept_tool as _ct
-    _ct._concepts = None  # 캐시 무효화
+        concepts = json.loads(_CONCEPTS_PATH.read_text(encoding="utf-8"))
+        concepts[tag] = concept_data
+        _CONCEPTS_PATH.write_text(
+            json.dumps(concepts, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        import tools.concept_tool as _ct
+        _ct._concepts = None  # 캐시 무효화
 
-    points = "\n".join(f"  • {p}" for p in concept_data["핵심_포인트"])
-    return (
-        f"【{tag}】(자동 생성)\n"
-        f"정의: {concept_data['정의']}\n\n"
-        f"핵심 포인트:\n{points}\n\n"
-        f"개선 방법: {concept_data['개선_방법']}"
-    )
+        points = "\n".join(f"  • {p}" for p in concept_data["핵심_포인트"])
+        return (
+            f"【{tag}】(자동 생성)\n"
+            f"정의: {concept_data['정의']}\n\n"
+            f"핵심 포인트:\n{points}\n\n"
+            f"개선 방법: {concept_data['개선_방법']}"
+        )
+    except Exception as e:
+        logger.warning("_handle_ict LLM/IO error: %s | tag=%s", e, tag)
+        return f"'{tag}' 관련 ICT 개념 설명 생성에 실패했습니다. 잠시 후 다시 시도해주세요."
 
 
 def _handle_psychology(tag: str) -> str:
@@ -205,16 +213,24 @@ def fallback_classify_node(state: dict) -> dict:
         return {"fallback_type": "", "messages": messages}
 
     tag = weaknesses[0]
-    raw_category = _classify_tag(tag)
-    fallback_type = _CATEGORY_MAP.get(raw_category, "pattern")
 
-    if raw_category == "ICT개념":
-        msg = _handle_ict(tag)
-    elif raw_category == "심리":
-        msg = _handle_psychology(tag)
-    else:
+    try:
+        raw_category = _classify_tag(tag)
+        fallback_type = _CATEGORY_MAP.get(raw_category, "pattern")
+
+        if raw_category == "ICT개념":
+            msg = _handle_ict(tag)
+        elif raw_category == "심리":
+            msg = _handle_psychology(tag)
+        else:
+            fallback_type = "pattern"
+            msg = _handle_pattern(tag, session_id)
+    except Exception as e:
+        logger.warning(
+            "fallback_classify_node error: %s | session_id=%s tag=%s", e, session_id, tag
+        )
         fallback_type = "pattern"
-        msg = _handle_pattern(tag, session_id)
+        msg = f"'{tag}' 처리 중 오류가 발생했습니다. 계속 모니터링하겠습니다."
 
     messages.append(AIMessage(content=msg))
     logger.info(
