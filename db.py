@@ -100,12 +100,6 @@ def init_db() -> None:
         except Exception:
             pass
 
-        # journal_entries ict_tag 컬럼
-        try:
-            conn.execute("ALTER TABLE journal_entries ADD COLUMN ict_tag TEXT DEFAULT ''")
-        except Exception:
-            pass
-
         # trade_tags 포지션 사이징 컬럼
         for col_ddl in [
             "ALTER TABLE trade_tags ADD COLUMN fixed_loss  FLOAT DEFAULT 0.0",
@@ -138,6 +132,33 @@ def init_db() -> None:
                 created_at     TEXT,
                 UNIQUE(session_id, order_id)
             )
+        """)
+
+        # journal_entries 테이블 (journal_nodes.py::_format_journal_entry 출력과 컬럼 일치)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS journal_entries (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id   TEXT    NOT NULL,
+                order_id     TEXT    NOT NULL,
+                symbol       TEXT,
+                direction    TEXT,
+                result       TEXT,
+                entry_reason TEXT,
+                exit_reason  TEXT,
+                reflection   TEXT,
+                rr           FLOAT,
+                date         TEXT    NOT NULL,
+                execTime     INTEGER,
+                exitTime     INTEGER,
+                closedPnl    FLOAT,
+                ict_tag      TEXT    DEFAULT '',
+                UNIQUE(session_id, order_id)
+            )
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_journal_entries_session_date
+                ON journal_entries (session_id, date)
         """)
 
 

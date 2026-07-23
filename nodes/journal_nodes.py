@@ -42,6 +42,7 @@ def journal_write_node(state: dict) -> dict:
 
     # Buy→Sell 페어링: 같은 symbol 첫 매칭
     entry_time_map: dict[int, int] = {}
+    entry_order_map: dict[int, str] = {}
     used_buys: set[int] = set()
     for j, sell in enumerate(sell_trades):
         for i, buy in enumerate(buy_trades):
@@ -49,6 +50,7 @@ def journal_write_node(state: dict) -> dict:
                 continue
             if buy.get("symbol") == sell.get("symbol"):
                 entry_time_map[j] = int(buy.get("execTime", 0))
+                entry_order_map[j] = buy.get("orderId", "")
                 used_buys.add(i)
                 break
 
@@ -59,7 +61,32 @@ def journal_write_node(state: dict) -> dict:
         if buy_exec_time:
             entry["exitTime"] = entry["execTime"]   # sell execTime → 청산시각
             entry["execTime"] = buy_exec_time        # buy execTime  → 진입시각
+        entry["order_id"] = entry_order_map.get(j) or sell.get("orderId", "")
         entries.append(entry)
+
+    _persist_journal_entries(session_id, entries)
 
     logger.info("journal_write_node end | session_id=%s entries=%d", session_id, len(entries))
     return {"journal_entries": entries}
+
+
+def _persist_journal_entries(session_id: str, entries: list[dict]) -> None:
+    from db import get_db
+
+    with get_db() as conn:
+        for e in entries:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO journal_entries
+                    (session_id, order_id, symbol, direction, result,
+                     entry_reason, exit_reason, reflection, rr,
+                     date, execTime, exitTime, closedPnl)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session_id, e.get("order_id", ""), e["symbol"], e["direction"], e["result"],
+                    e["entry_reason"], e["exit_reason"], e["reflection"], e["rr"],
+                    e["date"], e["execTime"], e.get("exitTime"), e["closedPnl"],
+                ),
+            )
+    logger.info("journal_write_node persisted | session_id=%s rows=%d", session_id, len(entries))
