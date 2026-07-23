@@ -666,8 +666,15 @@ else:
             desc_html = '<div style="background:#1E2A3A;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:11px;line-height:1.9;color:#A8B8C8">'
             desc_html += '<b style="color:#7EB8D4">📐 A+ 채점 기준</b><br>'
             for _k, (_label, _desc) in CRITERIA_DESC.items():
-                icon = "✅" if bd.get(_k) else "❌"
-                desc_html += f"{icon} <b>{_label}</b>: {_desc}<br>"
+                _val = bd.get(_k)
+                if _val is None:
+                    desc_html += (
+                        f'<span style="color:#7B8296">❔ <b>{_label}</b>: '
+                        f"데이터 없음</span><br>"
+                    )
+                else:
+                    icon = "✅" if _val else "❌"
+                    desc_html += f"{icon} <b>{_label}</b>: {_desc}<br>"
             _stop_assessment = bd.get("stop_assessment", "")
             if _stop_assessment and _stop_assessment != "손절가 미입력":
                 _stop_icon = "✅" if bd.get("stop_position") else "❌"
