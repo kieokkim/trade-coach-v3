@@ -90,3 +90,47 @@ BTC-001 실거래 데이터로 90분 클리핑 + 진입가 포함 존 1개 정�
 다음 세션: 손절규율(C, Decision 46의 별도 트랙) — journal_entries 저장
 위치 설계 결정 선행, Upbit 캔들 경로 실패/빈데이터 구분도 아직 미해결로
 남음.
+
+---
+
+## 2026-07-24: STEP2-C — journal_entries 실제 영속화 + 손절규율 unscored화 (Decision 46 후속)
+
+**발견:** Decision 46에서 journal_entries가 메인그래프 state 필드(인메모리)와
+entry_reason_node가 SQL로 쿼리하는 테이블명이 겹치는 이름 충돌이었고, db.py에는
+`ALTER TABLE journal_entries ADD COLUMN ict_tag`만 있고 CREATE TABLE 자체가
+없어 매 실행마다 try/except로 조용히 실패하는 유령 테이블이었음을 확인.
+그 결과 entry_reason_node.py::score_aplus의 손절규율 쿼리가 항상 예외를 타
+`except: bd["stop_discipline"]=True`로 로그 없이 무조건 통과 처리되고 있었다.
+
+**원인:** Decision 46에서 갈렸던 두 설계안((a)journal_write_node가 실제
+테이블에도 저장 vs (b)trade_tags/trade_history로 재설계) 중 (a)를 선택 — 저장
+경로가 없는 게 근본원인이지 판정 로직 자체는 정상이었으므로. 컬럼 스키마는
+journal_nodes.py::_format_journal_entry의 실제 반환 dict(date, symbol,
+direction, result, entry_reason, exit_reason, reflection, rr, execTime,
+closedPnl + 조건부 exitTime)를 그대로 옮겼고, 식별 키는 pages/3_main.py 전역에서
+이미 쓰이는 buy_t.get("orderId")와 통일해 session_id+order_id UNIQUE로 잡았다.
+"손절 3회 미만이라 pass"와 "그 날짜 데이터가 애초에 없어 판정 불가"가 코드상
+구분이 안 됐던 게 두 번째 근본원인 — 둘 다 stop_discipline=True/False 이진값
+하나로 뭉쳐 있었다.
+
+**조치:**
+- fix(db): CREATE TABLE journal_entries 추가(UNIQUE(session_id, order_id)),
+  선행 ALTER ADD COLUMN ict_tag는 테이블 없이 항상 no-op였던 죽은 마이그레이션이라
+  제거(CREATE TABLE에 이미 포함)
+- fix(journal_nodes): journal_write_node가 buy 주문 orderId로 페어링해
+  INSERT OR IGNORE로 실제 저장(인메모리 state 반환은 기존 그대로)
+- fix(entry_reason_node): score_aplus가 해당 세션·날짜에 journal_entries
+  레코드가 아예 없으면 stop_discipline=None(unscored), 있으면 손절 3회 미만
+  여부로 True/False 반환. except 분기도 로그 남기고 None으로 통일. LLM
+  프롬프트의 아이콘 렌더링도 3치 반영
+- fix(3_main): A+ 채점 카드에서 None을 목업 v7 스타일(회색 ❔ + "데이터 없음")로
+  렌더링, 기존 4개 기준(구조진입/반등확인/추세정렬/킬존)은 이진값 그대로라
+  변경 없음
+
+**결과:** 3개 커밋 전부 로컬 완료(push 안 함). 재현 확인은 스크래치 DB에
+db.init_db() 후 journal_write_node/score_aplus를 직접 호출하는 방식으로 진행
+(실거래 API 키 없이 로직 검증) — (1)INSERT OR IGNORE로 같은 session_id+order_id
+재실행 시 중복 안 쌓이는 것 확인 (2)해당 날짜 데이터 0건→None, 손절 1건→True,
+3건→False, 다른 session_id→다시 None까지 4가지 케이스 전부 의도대로 분기
+확인. 메인 그래프 실전행(실 API 키)을 통한 (a)~(d) 전체 e2e 재현은 이번
+세션에서 안 함 — 다음 세션에서 실거래 실행 후 SELECT로 재확인 필요.
