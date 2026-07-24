@@ -1,4 +1,4 @@
-# CLAUDE.md — TradeCoach v2.1 코딩 행동 지침
+# CLAUDE.md — TradeCoach v2.3 코딩 행동 지침
 
 Behavioral guidelines for Claude Code. Merge with task-specific instructions as needed.
 
@@ -29,7 +29,7 @@ Behavioral guidelines for Claude Code. Merge with task-specific instructions as 
 
 ---
 
-## TradeCoach v2.1 작업 규칙
+## TradeCoach v2.3 작업 규칙
 
 ### 공통 조건 (모든 작업에 적용)
 - 기준 파일: `graph.py` + `nodes/*.py` (실제 로직)
@@ -37,7 +37,7 @@ Behavioral guidelines for Claude Code. Merge with task-specific instructions as 
 - 노드 파일에 `logger = logging.getLogger(__name__)` 필수
 - 작업 완료 후 `git add -A && git commit`
 
-### v2.1 신규 원칙
+### v2.3 신규 원칙
 - ICT 탐지는 rule-based 우선 (LLM 차트 해석 최소화)
 - 캔들 데이터는 `market/candles.py`로 중앙화
 - Streamlit 페이지는 `pages/` 폴더에서만 작업

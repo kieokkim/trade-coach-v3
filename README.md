@@ -99,7 +99,10 @@ LLM_PROVIDER=openai      # openai 또는 groq
 
 | 영역 | 기술 |
 |------|------|
-| AI 파이프라인 | LangGraph / LangChain / OpenAI GPT-4o-mini |
+| AI 파이프라인 | LangGraph / LangChain / OpenAI GPT-4o-mini / Groq |
+| 백엔드 API | FastAPI |
+| Observability | Langfuse |
+| RAG | ChromaDB + bge-m3 |
 | 거래소 연동 | Bybit V5 API (pybit) |
 | 프론트엔드 | Streamlit / Plotly |
 | 저장소 | SQLite |
