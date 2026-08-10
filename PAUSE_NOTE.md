@@ -192,8 +192,21 @@ trade-coach-v3/
   방어, 캔들 실패/빈데이터 구분(Bybit만), 복기뷰어 존 렌더링 클리핑,
   journal_entries 실제 영속화 + 손절규율 3치(pass/fail/unscored)화
 
+### 트러블슈팅 기록 (docs/archive/TradeCoach_COACHING_NOTES.md에서 흡수, DECISION_LOG에 없는 고유 내용)
+
+**progress_compare_node 레거시 데이터 오염:**
+실제 DB로 세션 간 약점 비교를 돌렸을 때 `BTC_개선필요` 같은 v2.0~v2.1 시절
+종목명 기반 태그가 `new`로 오분류됨. 원인은 v2.2에서 약점 태그를 ICT 개념
+기반으로 전환(TC-D17)했으나 DB에 레거시 행이 남아있던 것.
+`DELETE FROM weaknesses WHERE weakness LIKE '%_개선필요'` 실행 후 재검증으로
+해소. 교훈: 기능 변경 시 코드뿐 아니라 기존 DB 데이터의 하위호환성도 함께
+점검해야 함.
+
 **보류된 계획(v3.0~v5.0):** Market Scanner / Trade Journal / Personal Coach —
 TC-D48로 전부 보류. 상세는 과거 `FUTURE_ROADMAP.md`(git history) 참조.
+별도 안으로 `feature/dashboard-v2`(기간별 성과 대시보드 + 장기 반복 약점
+추적 + 패턴 임베딩 기반 A+ 셋업 유사도 분석)도 있었음 — FUTURE_ROADMAP의
+v3.0~v5.0과는 별개 계획, 이것도 TC-D48로 함께 보류.
 
 ---
 
@@ -258,3 +271,19 @@ DB 스키마 정리는 범위 밖으로 남아 반영 안 됨.
 
 **결과:** 실질적 영향 없음(빈 테이블만 계속 생성됨). 재개 시 또는 다음
 레포정리 세션에서 `DROP TABLE` 후보.
+
+### 결함 C: replay_coach_node raw 예외 노출
+
+**발견:** `nodes/replay_coach_node.py:110` — LLM 호출 실패 시
+`f"...LLM 호출 실패: {e}"`로 raw 예외 문자열을 사용자 복기 코멘트에 그대로
+노출. 2026-07-22 실사용 스크린샷에서 "Missing credentials. Please pass an
+api_key..."가 화면에 그대로 찍힌 것이 이 결함.
+
+**원인:** STEP2a에서 `entry_reason_node`는 raw 에러 없는 fallback 문구로
+고쳤으나 같은 패턴의 `replay_coach_node`는 그 세션 범위에서 누락됨.
+
+**조치:** 동결. 고치지 않음.
+
+**결과:** LLM 실패(키 없음/네트워크 오류 등) 시 복기 코멘트에 SDK 원본
+에러 메시지가 그대로 사용자에게 노출됨. 재개 시 다른 5개 LLM 노드의 방어
+패턴대로 사용자용 문구 대체 필요.
