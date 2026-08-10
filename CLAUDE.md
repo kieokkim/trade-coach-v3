@@ -1,5 +1,7 @@
 # CLAUDE.md — TradeCoach v2.3 코딩 행동 지침
 
+> ⏸️ **보류 중 (TC-D48, DECISION_LOG.md 참고).** 재개 조건·상태는 PAUSE_NOTE.md.
+
 Behavioral guidelines for Claude Code. Merge with task-specific instructions as needed.
 
 ---

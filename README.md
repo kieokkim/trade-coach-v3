@@ -136,13 +136,19 @@ trade-coach-v3/
 | v2.1 | ✅ | 복기 뷰어 — Kline 캔들 + FVG/OB 탐지 |
 | v2.2 | ✅ | A+ 채점 + 진입 근거 추론 + AI-as-Judge |
 | v2.3 | ✅ | 손절가/RR + 포지션 사이징 + 조기 청산 탐지 + 샘플 데이터 시장가 기반 재생성 |
-| v3.0 | 🔜 | Market Scanner — 실시간 셋업 감지 + 알림 시스템 + 스타일 레이어 기초 |
-| v4.0 | 🔜 | Trade Journal — 진입 시점 근거 기록 + 청산 감지 자동 복기 + 진입 의도 교차 검증 |
+| v3.0 | ⏸️ | Market Scanner — TC-D48로 보류 |
+| v4.0 | ⏸️ | Trade Journal — TC-D48로 보류 |
 
 ---
 
+## 프로젝트 상태
+
+⏸️ **보류 중 (TC-D48).** 되살림 조건은 `PAUSE_NOTE.md` 참고.
+
 ## 문서
 
+- `CLAUDE.md`: 작업 규칙
 - `DECISION_LOG.md`: 아키텍처 결정 이력
-- `FUTURE_ROADMAP.md`: 개발 계획
-- `docs/`: 상세 설계 문서
+- `DEVLOG.md`: 세션별 작업 기록
+- `PAUSE_NOTE.md`: 보류 스냅샷 (재개 시 여기부터)
+- `ROADMAP_TRADECOACH.md`: 로드맵
