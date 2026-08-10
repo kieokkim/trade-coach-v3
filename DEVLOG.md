@@ -5,7 +5,7 @@
 
 ---
 
-## 2026-07-22: SalesCoach 방식 이식 킥오프 — 스펙트럼 확인 → 감사 → 명명 → UI 목업 (Decision 1~8)
+## 2026-07-22: SalesCoach 방식 이식 킥오프 — 스펙트럼 확인 → 감사 → 명명 → UI 목업 (TC-D38~45)
 
 **발견:** TRADECOACH_KICKOFF_BRIEF.md 기준 4단계를 순서대로 진행. 1단계에서
 제품이 행동 교정 축(코치형)임을 확정하고, 2단계 엣지케이스 감사에서 happy path는
@@ -36,15 +36,15 @@ tradecoach_mockup_v7.html(최종 목업), 2단계 감사 보고서. 다음 코�
 → 클릭 버튼 대체 + 다중 탭 st.session_state 수동 구현 + 탭 결과 캐시.
 
 **미결(다음 세션 판단 대기):**
-- DECISION_LOG.md의 Decision 1~8 Tier 재검토(현재 D1~5 Tier1/D6~8 Tier2 잠정 배치)
+- DECISION_LOG.md의 TC-D38~45 Tier 재검토(현재 D1~5 Tier1/D6~8 Tier2 잠정 배치)
 - TradeCoach 포트폴리오 8단 구조 적용(SalesCoach 완료분과 동일 구조, 소재는
   이번 명명·감사·재설계 서사 활용)
 - v3.0 Style Layer에서 DCA 페르소나 분기 설계(오늘 발견한 커버 갭 근거)
-- Decision 37과 결함1/9의 관계는 STEP1 조사에서 재확인 필요 — 병합 시 발견됨.
+- TC-D37과 결함1/9의 관계는 STEP1 조사에서 재확인 필요 — 병합 시 발견됨.
 
 ---
 
-## 2026-07-22: STEP1 진단 확정 세션 (Decision 46)
+## 2026-07-22: STEP1 진단 확정 세션 (TC-D46)
 
 **발견:** 결함4/10이 예상보다 큼(이름 충돌·유령 테이블), 존 렌더링은 백엔드
 문제가 아니라 프론트 필터링 부재였음.
@@ -55,14 +55,14 @@ tradecoach_mockup_v7.html(최종 목업), 2단계 감사 보고서. 다음 코�
 **조치:** 코드 변경 없음(조사만). 수정 세션 순서 재조정 — A/B/존필터링을 한
 세션으로, C(손절규율 재설계)는 설계결정 선행 필요해 분리.
 
-**결과:** Decision 46 기록. 다음 세션 = A+B+존필터링 코딩(즉시 착수 가능),
+**결과:** TC-D46 기록. 다음 세션 = A+B+존필터링 코딩(즉시 착수 가능),
 C는 trade_tags/trade_history 스키마 확인 후 별도 착수.
 
 ---
 
 ## 2026-07-23: STEP2a 코딩 세션 — fallback 방어 + 실패/빈데이터 구분 + 존 렌더링 필터링
 
-**발견:** 세 항목 모두 Decision 46에서 확정한 방향대로 구현 가능했음. 다만
+**발견:** 세 항목 모두 TC-D46에서 확정한 방향대로 구현 가능했음. 다만
 Fix B 범위를 bybit_client.py로 한정해서 UpbitClient.fetch_candles는 여전히
 예외를 삼켜 [] 반환 — Upbit 경로는 실패/빈데이터 구분이 아직 안 됨.
 
@@ -70,7 +70,7 @@ Fix B 범위를 bybit_client.py로 한정해서 UpbitClient.fetch_candles는 여
 fallback_classify_node에 다른 5개 LLM 노드와 다르게 try/except가 없었던 게
 원인. Fix B는 BybitClient.fetch_candles가 실패/빈응답을 동일하게 [] 처리한
 게 원인. Fix C는 존 rect의 x1이 항상 차트 끝까지였던 게 원인(발생시각은
-이미 정확히 쓰고 있었음 — Decision 46에서 확인한 대로).
+이미 정확히 쓰고 있었음 — TC-D46에서 확인한 대로).
 
 **조치:**
 - fix(coaching-nodes): _classify_tag/_handle_ict/fallback_classify_node에
@@ -87,22 +87,22 @@ LLM mock 실패 후 예외 전파 없이 pattern 폴백 확인, Fix B는 (a)키�
 (b)네트워크예외 (c)진짜빈데이터 세 케이스 모두 의도대로 분기 확인, Fix C는
 BTC-001 실거래 데이터로 90분 클리핑 + 진입가 포함 존 1개 정확히 강조되는
 것 확인(픽셀 스크린샷 비교는 브라우저 확장 미설치로 생략, 로직 검증만).
-다음 세션: 손절규율(C, Decision 46의 별도 트랙) — journal_entries 저장
+다음 세션: 손절규율(C, TC-D46의 별도 트랙) — journal_entries 저장
 위치 설계 결정 선행, Upbit 캔들 경로 실패/빈데이터 구분도 아직 미해결로
 남음.
 
 ---
 
-## 2026-07-24: STEP2-C — journal_entries 실제 영속화 + 손절규율 unscored화 (Decision 46 후속)
+## 2026-07-24: STEP2-C — journal_entries 실제 영속화 + 손절규율 unscored화 (TC-D46 후속)
 
-**발견:** Decision 46에서 journal_entries가 메인그래프 state 필드(인메모리)와
+**발견:** TC-D46에서 journal_entries가 메인그래프 state 필드(인메모리)와
 entry_reason_node가 SQL로 쿼리하는 테이블명이 겹치는 이름 충돌이었고, db.py에는
 `ALTER TABLE journal_entries ADD COLUMN ict_tag`만 있고 CREATE TABLE 자체가
 없어 매 실행마다 try/except로 조용히 실패하는 유령 테이블이었음을 확인.
 그 결과 entry_reason_node.py::score_aplus의 손절규율 쿼리가 항상 예외를 타
 `except: bd["stop_discipline"]=True`로 로그 없이 무조건 통과 처리되고 있었다.
 
-**원인:** Decision 46에서 갈렸던 두 설계안((a)journal_write_node가 실제
+**원인:** TC-D46에서 갈렸던 두 설계안((a)journal_write_node가 실제
 테이블에도 저장 vs (b)trade_tags/trade_history로 재설계) 중 (a)를 선택 — 저장
 경로가 없는 게 근본원인이지 판정 로직 자체는 정상이었으므로. 컬럼 스키마는
 journal_nodes.py::_format_journal_entry의 실제 반환 dict(date, symbol,

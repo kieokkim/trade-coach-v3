@@ -90,7 +90,7 @@ Ground Truth로 활용. 사람이 매번 차트를 보고 판단하는 대신,
 - scripts/eval_aplus_validation.py (자동 검증 스크립트)
 - scripts/generate_sample_candles.py (구조 검증 + 주입 로직 추가)
 - nodes/entry_reason_node.py (fvg_before/ob_before 필터)
-- DECISION_LOG.md Decision 30
+- DECISION_LOG.md TC-D30
 
 ### 2. 멀티모델 비교 평가 (✅ 완료)
 
@@ -99,14 +99,14 @@ Ground Truth로 활용. 사람이 매번 차트를 보고 판단하는 대신,
 - 단서: 작은 모델(llama-3.1-8b)은 이전에 rate limit+루프 문제 있었음
   → "Groq 우수"가 아니라 "모델 크기가 핵심"
 
-산출물: scripts/eval_multimodel_comparison.py, Decision 31
+산출물: scripts/eval_multimodel_comparison.py, TC-D31
 
 ### 3. 보안 — Bybit API 권한 분리 (✅ 완료)
 
 결과: 본인 실제 API 키에서 거래 권한 7개 탐지 성공
 (실전에서 바로 가치 증명됨)
 
-산출물: utils/api_safety.py, scripts/test_api_safety.py, Decision 32
+산출물: utils/api_safety.py, scripts/test_api_safety.py, TC-D32
 
 ---
 
@@ -117,20 +117,20 @@ Ground Truth로 활용. 사람이 매번 차트를 보고 판단하는 대신,
 결과: 4단계 가설 검증으로 임베딩 모델 한계 발견
 (MiniLM 0% → bge-m3 100%). entry_reason_node 코칭에 연결 완료.
 
-산출물: tools/ict_rag.py, tools/ict_search_text.py, Decision 33
+산출물: tools/ict_rag.py, tools/ict_search_text.py, TC-D33
 
 ### 5. FastAPI 백엔드 분리 (✅ 완료)
 
 결과: /analyze, /replay/candles, /replay/aplus 4개 엔드포인트.
 실시간 노드 로그는 의도적으로 포기, 구조 분리를 우선시.
 
-산출물: api/main.py, Decision 35
+산출물: api/main.py, TC-D35
 
 ### 6. Observability (✅ 완료)
 
 결과: Langfuse lazy import 설계 — 키 없으면 기존 동작 100% 유지.
 
-산출물: utils/observability.py, Decision 36
+산출물: utils/observability.py, TC-D36
 
 ---
 
@@ -151,7 +151,7 @@ After: weaknesses 테이블의 last_seen 날짜 기준으로
 트러블슈팅 — 레거시 데이터 오염:
   발견: 실제 DB로 비교를 돌렸을 때 'BTC_개선필요' 같은
         종목명 기반 태그가 'new'로 잘못 분류됨
-  원인: v2.2에서 약점 태그를 ICT 개념 기반으로 전환했지만(Decision 17)
+  원인: v2.2에서 약점 태그를 ICT 개념 기반으로 전환했지만(TC-D17)
         DB에 이미 저장된 v2.0~v2.1 시절 레거시 데이터가 남아있었음
   해결: DELETE FROM weaknesses WHERE weakness LIKE '%_개선필요'
         실행 후 재검증 → 깨끗한 ICT 기반 비교 결과 확인
